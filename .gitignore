@@ -1,0 +1,7 @@
+.venv/
+.odoo-data/
+.DS_Store
+__pycache__/
+*.py[cod]
+.env
+odoo.conf
