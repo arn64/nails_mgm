@@ -1,5 +1,7 @@
 # Part of Nails MGM. See LICENSE file for full copyright and licensing details.
 
+import base64
+
 from odoo import http
 from odoo.exceptions import ValidationError
 from odoo.http import request
@@ -63,8 +65,9 @@ class BeautyBookingController(http.Controller):
 
     @http.route("/reservar", type="http", auth="public", website=True, methods=["GET"])
     def booking_page(self, **kw):
+        raw_ids = request.httprequest.args.getlist("service_ids") or kw.get("service_ids")
         values = self._booking_values(
-            service_ids=_to_int_list(kw.get("service_ids")),
+            service_ids=_to_int_list(raw_ids),
             technician_id=int(kw["technician_id"]) if str(kw.get("technician_id") or "").isdigit() else None,
             day=kw.get("day"),
             start_utc=kw.get("start_utc"),
@@ -134,3 +137,33 @@ class BeautyBookingController(http.Controller):
             "appointment": appointment,
             "services": appointment.service_ids,
         })
+
+    @http.route("/reservar/catalogo", type="http", auth="public", website=True, methods=["GET"])
+    def booking_catalog(self, **kw):
+        """Dosier de servicios con foto y descripción."""
+        Service = request.env["beauty.service"].sudo()
+        services = Service.search([("active", "=", True)], order="service_type, name")
+        raw_ids = request.httprequest.args.getlist("service_ids") or kw.get("service_ids")
+        service_ids = [s for s in _to_int_list(raw_ids) if s in services.ids]
+        back_url = "/reservar" + "".join(
+            f"{'?' if i == 0 else '&'}service_ids={s}"
+            for i, s in enumerate(service_ids)
+        )
+        return request.render("beauty_salon.beauty_booking_catalog", {
+            "services": services,
+            "service_ids": service_ids,
+            "back_url": back_url,
+        })
+
+    @http.route("/reservar/servicio/<int:service_id>/imagen", type="http", auth="public")
+    def booking_service_image(self, service_id):
+        """Foto del servicio; si no tiene, imagen por defecto del salón."""
+        service = request.env["beauty.service"].sudo().browse(service_id).exists()
+        if service and service.image:
+            raw = base64.b64decode(service.image)
+            ctype = "image/jpeg" if raw[:2] == b"\xff\xd8" else "image/png"
+            return request.make_response(
+                raw,
+                headers=[("Content-Type", ctype), ("Cache-Control", "public, max-age=86400")],
+            )
+        return request.redirect("/beauty_salon/static/src/img/logo-256.png", code=302)

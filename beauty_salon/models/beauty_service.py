@@ -16,6 +16,18 @@ class BeautyService(models.Model):
         default="nails",
         index=True,
     )
+    schedule = fields.Selection(
+        [
+            ("morning", "Mañana (10:00–11:30 am)"),
+            ("afternoon", "Tarde (1:30–5:00 pm)"),
+            ("both", "Mañana y tarde"),
+        ],
+        string="Turno",
+        required=True,
+        default="both",
+        index=True,
+        help="Turnos en los que se puede reservar este servicio desde la web.",
+    )
     list_price = fields.Monetary(
         string="Precio", required=True, default=0.0, currency_field="currency_id"
     )
@@ -31,7 +43,7 @@ class BeautyService(models.Model):
         domain="[('type', '=', 'service')]",
         help="Producto de servicio usado al crear el pedido. Si está vacío se crea uno automáticamente.",
     )
-    active = fields.Boolean(default=True)
+    active = fields.Boolean(string="Activo", default=True)
     color = fields.Integer(string="Color")
     image = fields.Image(max_width=512, max_height=512)
     appointment_ids = fields.Many2many(

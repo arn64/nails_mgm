@@ -1,11 +1,14 @@
 # Part of Nails MGM. See LICENSE file for full copyright and licensing details.
 
+import logging
 from datetime import datetime, timedelta
 
 import pytz
 
 from odoo import api, fields, models
 from odoo.exceptions import UserError, ValidationError
+
+_logger = logging.getLogger(__name__)
 
 
 class BeautyAppointment(models.Model):
@@ -74,8 +77,11 @@ class BeautyAppointment(models.Model):
     user_id = fields.Many2one(
         "res.users", default=lambda self: self.env.user, string="Responsable"
     )
-    active = fields.Boolean(default=True)
+    active = fields.Boolean(string="Activo", default=True)
     service_type_display = fields.Char(compute="_compute_service_type_display")
+    service_names_display = fields.Char(
+        string="Servicios (texto)", compute="_compute_service_names_display"
+    )
 
     @api.depends("service_ids", "service_ids.list_price")
     def _compute_amount_total(self):
@@ -88,6 +94,11 @@ class BeautyAppointment(models.Model):
         for appt in self:
             types = sorted({labels.get(s.service_type, "") for s in appt.service_ids})
             appt.service_type_display = ", ".join(t for t in types if t)
+
+    @api.depends("service_ids", "service_ids.name")
+    def _compute_service_names_display(self):
+        for appt in self:
+            appt.service_names_display = ", ".join(appt.service_ids.mapped("name"))
 
     @api.depends("start_datetime", "duration")
     def _compute_end_datetime(self):
@@ -146,6 +157,29 @@ class BeautyAppointment(models.Model):
         if any(appt.state != "draft" for appt in self):
             raise UserError("Solo se pueden confirmar citas en borrador.")
         self.write({"state": "confirmed"})
+        self._notify_technician_email()
+
+    def _notify_technician_email(self):
+        """Avisa por correo a la técnica al confirmar la cita.
+
+        Nunca bloquea la confirmación: sin email de técnica o sin
+        servidor configurado, la cita queda confirmada igual.
+        """
+        template = self.env.ref(
+            "beauty_salon.beauty_appointment_technician_email",
+            raise_if_not_found=False,
+        )
+        if not template:
+            return
+        for appt in self.sudo():
+            if not appt.technician_id.email:
+                _logger.debug("Aviso técnica omitido %s: sin email", appt.name)
+                continue
+            try:
+                mail_id = template.send_mail(appt.id, force_send=False)
+                _logger.info("Aviso técnica %s: mail %s", appt.name, mail_id)
+            except Exception as err:  # noqa: BLE001 - el aviso no bloquea
+                _logger.warning("No se pudo avisar a la técnica %s: %s", appt.name, err)
 
     def action_done(self):
         if any(appt.state != "confirmed" for appt in self):
@@ -219,13 +253,47 @@ class BeautyAppointment(models.Model):
         }
 
     # --- Reserva web pública ---
-    # Horario del salón (hora local). Ajusta aquí si cambia el horario.
+    # Horario del salón (hora local). Ventanas en minutos desde medianoche.
+    # Ej.: (10:00-11:30) y (13:30-17:00). Ajusta aquí si cambia el horario.
     BOOKING_TZ = "Europe/Madrid"
-    BOOKING_OPEN_HOUR = 9
-    BOOKING_CLOSE_HOUR = 17
+    BOOKING_WINDOWS = [(10 * 60, 11 * 60 + 30), (13 * 60 + 30, 17 * 60)]
+    BOOKING_HOURS_LABEL = "10:00–11:30 am y 1:30–5:00 pm"
+    # Ventana 0 = mañana, ventana 1 = tarde (índices de BOOKING_WINDOWS).
+    BOOKING_SCHEDULE_WINDOWS = {"morning": (0,), "afternoon": (1,), "both": (0, 1)}
     BOOKING_SLOT_MINUTES = 30
     BOOKING_DAYS_AHEAD = 14
     BOOKING_MIN_ANTICIPATION_MINUTES = 60
+
+    @api.model
+    def _booking_windows_for_services(self, services):
+        """Ventanas permitidas según el turno de los servicios elegidos.
+
+        Si solo se elige un servicio de mañana, no se muestra la tarde
+        y viceversa. Con varios servicios se unen los turnos.
+        """
+        indexes = set()
+        for service in services:
+            indexes.update(self.BOOKING_SCHEDULE_WINDOWS.get(service.schedule or "both", (0, 1)))
+        return [self.BOOKING_WINDOWS[i] for i in sorted(indexes)] or list(self.BOOKING_WINDOWS)
+
+    @api.model
+    def _booking_format_label(self, hour, minute):
+        """Hora normal 12h con am/pm: 10:00 am, 1:30 pm."""
+        suffix = "am" if hour < 12 else "pm"
+        hour12 = hour % 12 or 12
+        return f"{hour12}:{minute:02d} {suffix}"
+
+    @api.model
+    def _booking_slot_in_hours(self, start_minutes, duration, services=None):
+        end_minutes = start_minutes + duration * 60
+        windows = (
+            self._booking_windows_for_services(services)
+            if services else self.BOOKING_WINDOWS
+        )
+        return any(
+            win_start <= start_minutes and end_minutes <= win_end + 1e-6
+            for win_start, win_end in windows
+        )
 
     @api.model
     def _booking_tz(self):
@@ -278,30 +346,31 @@ class BeautyAppointment(models.Model):
         min_start = now_utc + timedelta(minutes=self.BOOKING_MIN_ANTICIPATION_MINUTES)
 
         slots = []
-        cursor_minutes = self.BOOKING_OPEN_HOUR * 60
-        close_minutes = self.BOOKING_CLOSE_HOUR * 60
         step = self.BOOKING_SLOT_MINUTES
-        while cursor_minutes * 1.0 + duration * 60 <= close_minutes + 1e-6:
-            hour, minute = divmod(cursor_minutes, 60)
-            local_dt = tz.localize(datetime(
-                day_date.year, day_date.month, day_date.day, hour, minute
-            ))
-            start_utc = local_dt.astimezone(pytz.utc).replace(tzinfo=None)
-            end_utc = start_utc + timedelta(hours=duration)
-            if start_utc >= min_start:
-                chosen = None
-                for tech in technicians:
-                    if self._booking_slot_is_free(tech, start_utc, end_utc):
-                        chosen = tech
-                        break
-                if chosen:
-                    slots.append({
-                        "start_utc": start_utc.strftime("%Y-%m-%d %H:%M:%S"),
-                        "label": f"{hour:02d}:{minute:02d}",
-                        "technician_id": chosen.id,
-                        "technician_name": chosen.name,
-                    })
-            cursor_minutes += step
+        for win_start, win_end in self._booking_windows_for_services(services):
+            cursor_minutes = win_start
+            while cursor_minutes * 1.0 + duration * 60 <= win_end + 1e-6:
+                hour, minute = divmod(cursor_minutes, 60)
+                local_dt = tz.localize(datetime(
+                    day_date.year, day_date.month, day_date.day, hour, minute
+                ))
+                start_utc = local_dt.astimezone(pytz.utc).replace(tzinfo=None)
+                end_utc = start_utc + timedelta(hours=duration)
+                if start_utc >= min_start:
+                    chosen = None
+                    for tech in technicians:
+                        if self._booking_slot_is_free(tech, start_utc, end_utc):
+                            chosen = tech
+                            break
+                    if chosen:
+                        slots.append({
+                            "start_utc": start_utc.strftime("%Y-%m-%d %H:%M:%S"),
+                            "label": self._booking_format_label(hour, minute),
+                            "technician_id": chosen.id,
+                            "technician_name": chosen.name,
+                        })
+                cursor_minutes += step
+        slots.sort(key=lambda s: s["start_utc"])
         return slots
 
     @api.model
@@ -352,17 +421,16 @@ class BeautyAppointment(models.Model):
         duration = self._booking_duration_for_services(services)
         end_utc = start_utc + timedelta(hours=duration)
 
-        # No permitir pasado ni fuera de horario Lun-Vie 9-17 (hora local).
+        # No permitir pasado ni fuera de horario Lun-Vie 10:00-11:30 y 13:30-17:00 (hora local).
         tz = self._booking_tz()
         local_start = pytz.utc.localize(start_utc).astimezone(tz)
         if local_start.weekday() >= 5:
             raise ValidationError("Solo reservamos de lunes a viernes.")
-        open_minutes = self.BOOKING_OPEN_HOUR * 60
-        close_minutes = self.BOOKING_CLOSE_HOUR * 60
         start_minutes = local_start.hour * 60 + local_start.minute
-        if not (open_minutes <= start_minutes
-                and start_minutes + duration * 60 <= close_minutes + 1e-6):
-            raise ValidationError("Ese horario está fuera del horario del salón (9:00-17:00).")
+        if not self._booking_slot_in_hours(start_minutes, duration, services):
+            raise ValidationError(
+                f"Ese horario está fuera del horario del salón ({self.BOOKING_HOURS_LABEL})."
+            )
         if start_utc < datetime.now(pytz.utc).replace(tzinfo=None) + timedelta(
                 minutes=self.BOOKING_MIN_ANTICIPATION_MINUTES) - timedelta(minutes=1):
             raise ValidationError("Ese horario ya no está disponible.")

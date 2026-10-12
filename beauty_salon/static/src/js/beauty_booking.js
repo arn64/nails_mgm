@@ -91,12 +91,20 @@
         // que Odoo solo muestra a usuarios internos.
         const backendNav = document.querySelector(".o_frontend_to_backend_nav");
         if (backendNav) backendNav.remove();
+        const syncCatalogLink = () => {
+            const link = document.getElementById("booking_catalog_link");
+            if (!link) return;
+            const ids = selectedServices();
+            link.href = "/reservar/catalogo" + ids.map((id, i) => `${i ? "&" : "?"}service_ids=${id}`).join("");
+        };
         document.querySelectorAll(".booking-service").forEach((el) =>
             el.addEventListener("change", () => {
                 document.getElementById("booking_start_utc").value = "";
+                syncCatalogLink();
                 refresh(document.getElementById("booking_day").value || null);
             })
         );
+        syncCatalogLink();
         const tech = document.getElementById("booking_technician");
         if (tech) tech.addEventListener("change", () => refresh(document.getElementById("booking_day").value || null));
         document.querySelectorAll("#booking_days .btn-day").forEach((b) =>

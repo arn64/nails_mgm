@@ -53,6 +53,7 @@
                             <field name="end_datetime"/>
                             <field name="amount_total" readonly="1"/>
                             <field name="sale_order_id" readonly="1" invisible="not sale_order_id"/>
+                            <field name="active" widget="boolean_toggle"/>
                         </group>
                     </group>
                     <group string="Servicios">
@@ -118,6 +119,7 @@
                 <filter name="draft" string="Borrador" domain="[('state','=','draft')]"/>
                 <filter name="confirmed" string="Confirmadas" domain="[('state','=','confirmed')]"/>
                 <filter name="done" string="Realizadas" domain="[('state','=','done')]"/>
+                <filter name="archived" string="Archivadas" domain="[('active','=',False)]"/>
                 <filter name="today" string="Hoy" domain="[('start_datetime','&gt;=', (context_today()).strftime('%Y-%m-%d 00:00:00')), ('start_datetime','&lt;=', (context_today()).strftime('%Y-%m-%d 23:59:59'))]"/>
                 <group>
                     <filter name="by_tech" string="Técnica" context="{'group_by':'technician_id'}"/>

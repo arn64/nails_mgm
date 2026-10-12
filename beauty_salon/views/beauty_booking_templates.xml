@@ -17,7 +17,7 @@
                     <img src="/beauty_salon/static/src/img/logo-256.png" alt="Ailid Manso" width="88" height="88" class="beauty-hero-logo"/>
                     <div class="beauty-hero-brand">Ailid Manso · Salón de belleza</div>
                     <h1 class="beauty-hero-title">Reserva tu momento</h1>
-                    <p class="beauty-hero-sub">Lunes a viernes · 9:00 a 5:00</p>
+                    <p class="beauty-hero-sub">Lunes a viernes · 10:00–11:30 am y 1:30–5:00 pm</p>
                 </div>
             </div>
             <div class="container pb-5" id="beauty_booking">
@@ -35,7 +35,10 @@
 
                             <div class="card mb-3">
                                 <div class="card-body">
-                                    <h5 class="card-title">1 · Elige servicio</h5>
+                                    <div class="d-flex justify-content-between align-items-center mb-3">
+                                        <h5 class="card-title mb-0">1 · Elige servicio</h5>
+                                        <a id="booking_catalog_link" href="/reservar/catalogo" class="btn btn-primary beauty-catalog-btn">Ver catálogo</a>
+                                    </div>
                                     <t t-foreach="services" t-as="s">
                                         <div class="form-check">
                                             <input class="form-check-input booking-service" type="checkbox"
@@ -167,6 +170,48 @@
                             <div><a href="/reservar" class="btn btn-primary btn-lg">Hacer otra reserva</a></div>
                         </div>
                     </div>
+                </div>
+            </div>
+        </t>
+    </template>
+
+    <template id="beauty_booking_catalog" name="Catálogo de servicios">
+        <t t-call="website.layout">
+            <t t-set="no_header" t-value="True"/>
+            <t t-set="no_footer" t-value="True"/>
+            <t t-set="head">
+                <link rel="icon" type="image/x-icon" href="/beauty_salon/static/src/img/favicon.ico"/>
+                <link rel="icon" type="image/png" sizes="32x32" href="/beauty_salon/static/src/img/favicon-32.png"/>
+                <link rel="apple-touch-icon" href="/beauty_salon/static/src/img/logo-256.png"/>
+                <link rel="preconnect" href="https://fonts.googleapis.com"/>
+                <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous"/>
+                <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&amp;family=Jost:wght@300;400;500;600&amp;display=swap"/>
+            </t>
+            <div class="beauty-hero beauty-hero-ok">
+                <div class="container">
+                    <img src="/beauty_salon/static/src/img/logo-256.png" alt="Ailid Manso" width="72" height="72" class="beauty-hero-logo"/>
+                    <div class="beauty-hero-brand">Ailid Manso · Salón de belleza</div>
+                    <h1 class="beauty-hero-title">Nuestro dosier</h1>
+                    <p class="beauty-hero-sub">Conoce nuestros servicios antes de reservar</p>
+                </div>
+            </div>
+            <div class="container pb-5" id="beauty_catalog">
+                <div class="row g-4">
+                    <t t-foreach="services" t-as="s">
+                        <div class="col-md-6 col-lg-4">
+                            <div class="card beauty-catalog-card h-100">
+                                <img t-att-src="'/reservar/servicio/%s/imagen' % s.id" t-att-alt="s.name" class="beauty-catalog-img" loading="lazy"/>
+                                <div class="card-body">
+                                    <h5 class="card-title"><t t-esc="s.name"/></h5>
+                                    <div class="beauty-catalog-meta"><t t-esc="s.list_price"/> € · <t t-esc="s.duration"/> h</div>
+                                    <p class="beauty-catalog-desc"><t t-esc="s.description or 'Consulta en el salón los detalles de este servicio.'"/></p>
+                                </div>
+                            </div>
+                        </div>
+                    </t>
+                </div>
+                <div class="text-center mt-4">
+                    <a t-att-href="back_url" class="btn btn-primary btn-lg">← Volver a reservar</a>
                 </div>
             </div>
         </t>

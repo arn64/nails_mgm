@@ -18,7 +18,7 @@ class BeautyTechnician(models.Model):
         default=0.0,
         help="Porcentaje de comisión sobre los servicios realizados.",
     )
-    active = fields.Boolean(default=True)
+    active = fields.Boolean(string="Activo", default=True)
     color = fields.Integer()
     notes = fields.Text(string="Notas")
 

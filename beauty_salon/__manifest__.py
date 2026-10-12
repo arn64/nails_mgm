@@ -23,6 +23,7 @@ Gestión sencilla para salones de uñas y cejas:
         "security/ir.model.access.csv",
         "data/beauty_sequence.xml",
         "data/beauty_service_data.xml",
+        "data/beauty_appointment_mail.xml",
         "views/beauty_service_views.xml",
         "views/beauty_technician_views.xml",
         "views/beauty_appointment_views.xml",

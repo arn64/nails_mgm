@@ -7,6 +7,7 @@
             <list>
                 <field name="name"/>
                 <field name="service_type"/>
+                <field name="schedule"/>
                 <field name="list_price"/>
                 <field name="currency_id" column_invisible="True"/>
                 <field name="duration" widget="float_time"/>
@@ -34,10 +35,11 @@
                     <group>
                         <group string="General">
                             <field name="service_type"/>
+                            <field name="schedule" widget="radio"/>
                             <field name="list_price"/>
                             <field name="duration" widget="float_time"/>
                             <field name="product_id"/>
-                            <field name="active"/>
+                            <field name="active" widget="boolean_toggle"/>
                         </group>
                         <group string="Estadísticas">
                             <field name="appointment_count" readonly="1"/>
