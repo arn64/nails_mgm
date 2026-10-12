@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="beauty_booking_page" name="Reservar cita">
+        <t t-call="website.layout">
+            <t t-set="no_header" t-value="True"/>
+            <t t-set="no_footer" t-value="True"/>
+            <t t-set="head">
+                <link rel="icon" type="image/x-icon" href="/beauty_salon/static/src/img/favicon.ico"/>
+                <link rel="icon" type="image/png" sizes="32x32" href="/beauty_salon/static/src/img/favicon-32.png"/>
+                <link rel="apple-touch-icon" href="/beauty_salon/static/src/img/logo-256.png"/>
+                <link rel="preconnect" href="https://fonts.googleapis.com"/>
+                <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous"/>
+                <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&amp;family=Jost:wght@300;400;500;600&amp;display=swap"/>
+            </t>
+            <div class="beauty-hero">
+                <div class="container">
+                    <img src="/beauty_salon/static/src/img/logo-256.png" alt="Ailid Manso" width="88" height="88" class="beauty-hero-logo"/>
+                    <div class="beauty-hero-brand">Ailid Manso · Salón de belleza</div>
+                    <h1 class="beauty-hero-title">Reserva tu momento</h1>
+                    <p class="beauty-hero-sub">Lunes a viernes · 9:00 a 5:00</p>
+                </div>
+            </div>
+            <div class="container pb-5" id="beauty_booking">
+                <div class="row justify-content-center">
+                    <div class="col-lg-8">
+
+                        <t t-if="error">
+                            <div class="alert alert-danger" role="alert"><t t-esc="error"/></div>
+                        </t>
+
+                        <form action="/reservar/confirmar" method="post" id="beauty_booking_form">
+                            <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                            <input type="hidden" name="day" id="booking_day" t-att-value="day or ''"/>
+                            <input type="hidden" name="start_utc" id="booking_start_utc" t-att-value="start_utc or ''"/>
+
+                            <div class="card mb-3">
+                                <div class="card-body">
+                                    <h5 class="card-title">1 · Elige servicio</h5>
+                                    <t t-foreach="services" t-as="s">
+                                        <div class="form-check">
+                                            <input class="form-check-input booking-service" type="checkbox"
+                                                name="service_ids" t-att-value="s.id" t-att-id="'service_%s' % s.id"
+                                                t-att-checked="'checked' if s.id in service_ids else None"/>
+                                            <label class="form-check-label" t-att-for="'service_%s' % s.id">
+                                                <strong><t t-esc="s.name"/></strong>
+                                                <span class="text-muted"> · <t t-esc="s.list_price"/> € · <t t-esc="s.duration"/> h</span>
+                                            </label>
+                                        </div>
+                                    </t>
+                                </div>
+                            </div>
+
+                            <div class="card mb-3">
+                                <div class="card-body">
+                                    <h5 class="card-title">2 · Técnica (opcional)</h5>
+                                    <select name="technician_id" id="booking_technician" class="form-select">
+                                        <option value="">Primera disponible</option>
+                                        <t t-foreach="technicians" t-as="t">
+                                            <option t-att-value="t.id" t-att-selected="'selected' if technician_id == t.id else None">
+                                                <t t-esc="t.name"/>
+                                            </option>
+                                        </t>
+                                    </select>
+                                    <small class="text-muted">Si no eliges, asignamos la primera técnica libre.</small>
+                                </div>
+                            </div>
+
+                            <div class="card mb-3">
+                                <div class="card-body">
+                                    <h5 class="card-title">3 · Elige día</h5>
+                                    <t t-if="not service_ids">
+                                        <p class="text-muted mb-0">Marca un servicio para ver los días disponibles.</p>
+                                    </t>
+                                    <div id="booking_days" class="d-flex flex-wrap gap-2">
+                                        <t t-foreach="days" t-as="d">
+                                            <button type="button"
+                                                class="btn btn-day"
+                                                t-att-class="'btn btn-day ' + ('btn-primary' if d['date'] == day else 'btn-outline-primary')"
+                                                t-att-data-date="d['date']">
+                                                <t t-esc="d['weekday']"/><br/><strong><t t-esc="d['label']"/></strong>
+                                            </button>
+                                        </t>
+                                    </div>
+                                    <t t-if="service_ids and not days">
+                                        <p class="text-muted mt-2 mb-0">No hay huecos libres en los próximos días.</p>
+                                    </t>
+                                </div>
+                            </div>
+
+                            <div class="card mb-3">
+                                <div class="card-body">
+                                    <h5 class="card-title">4 · Elige hora <t t-if="duration">(<t t-esc="duration"/> h)</t></h5>
+                                    <div id="booking_slots" class="d-flex flex-wrap gap-2">
+                                        <t t-foreach="slots" t-as="sl">
+                                            <button type="button" class="btn btn-slot btn-outline-success"
+                                                t-att-data-start="sl['start_utc']">
+                                                <t t-esc="sl['label']"/>
+                                            </button>
+                                        </t>
+                                    </div>
+                                    <p id="booking_no_slots" class="text-muted mb-0" t-att-style="'display:none;' if slots else ''">Elige un día para ver las horas.</p>
+                                    <small class="text-muted d-block mt-2" t-if="slots">Hora local del salón (Europe/Madrid).</small>
+                                </div>
+                            </div>
+
+                            <div class="card mb-3">
+                                <div class="card-body">
+                                    <h5 class="card-title">5 · Tus datos</h5>
+                                    <div class="mb-3">
+                                        <label class="form-label" for="booking_name">Nombre *</label>
+                                        <input type="text" class="form-control" id="booking_name" name="name"
+                                            required="1" t-att-value="booking_name" placeholder="Tu nombre"/>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label" for="booking_phone">Teléfono *</label>
+                                        <input type="tel" class="form-control" id="booking_phone" name="phone"
+                                            required="1" t-att-value="booking_phone" placeholder="600 123 456"/>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label" for="booking_email">Correo electrónico (opcional)</label>
+                                        <input type="email" class="form-control" id="booking_email" name="email"
+                                            t-att-value="booking_email" placeholder="tu@correo.com"/>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary btn-lg w-100">Confirmar reserva</button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <script type="text/javascript" src="/beauty_salon/static/src/js/beauty_booking.js"/>
+        </t>
+    </template>
+
+    <template id="beauty_booking_ok" name="Reserva confirmada">
+        <t t-call="website.layout">
+            <t t-set="no_header" t-value="True"/>
+            <t t-set="no_footer" t-value="True"/>
+            <t t-set="head">
+                <link rel="icon" type="image/x-icon" href="/beauty_salon/static/src/img/favicon.ico"/>
+                <link rel="icon" type="image/png" sizes="32x32" href="/beauty_salon/static/src/img/favicon-32.png"/>
+                <link rel="apple-touch-icon" href="/beauty_salon/static/src/img/logo-256.png"/>
+                <link rel="preconnect" href="https://fonts.googleapis.com"/>
+                <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous"/>
+                <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&amp;family=Jost:wght@300;400;500;600&amp;display=swap"/>
+            </t>
+            <div class="beauty-hero beauty-hero-ok">
+                <div class="container">
+                    <div class="beauty-ok-check">✓</div>
+                    <h1 class="beauty-hero-title">¡Reserva confirmada!</h1>
+                    <p class="beauty-hero-sub">Te esperamos, <t t-esc="appointment.partner_id.name"/>.</p>
+                </div>
+            </div>
+            <div class="container pb-5" id="beauty_booking_ok">
+                <div class="row justify-content-center">
+                    <div class="col-lg-6">
+                        <div class="card">
+                            <div class="card-body">
+                                <div class="beauty-ok-row"><span class="beauty-ok-label">Referencia</span><strong><t t-esc="appointment.name"/></strong></div>
+                                <div class="beauty-ok-row"><span class="beauty-ok-label">Servicios</span><strong><t t-foreach="services" t-as="s"><t t-esc="s.name"/><span t-if="not s_last">, </span></t></strong></div>
+                                <div class="beauty-ok-row"><span class="beauty-ok-label">Técnica</span><strong><t t-esc="appointment.technician_id.name"/></strong></div>
+                                <div class="beauty-ok-row"><span class="beauty-ok-label">Inicio</span><strong><span t-field="appointment.start_datetime" t-options="{'widget': 'datetime'}"/></strong></div>
+                            </div>
+                        </div>
+                        <div class="text-center mt-4">
+                            <img src="/beauty_salon/static/src/img/logo-256.png" alt="Ailid Manso" width="48" height="48" class="beauty-ok-logo"/>
+                            <div><a href="/reservar" class="btn btn-primary btn-lg">Hacer otra reserva</a></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </t>
+    </template>
+</odoo>

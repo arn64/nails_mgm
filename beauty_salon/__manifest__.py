@@ -18,7 +18,7 @@ Gestión sencilla para salones de uñas y cejas:
     """,
     "author": "Nails MGM",
     "category": "Services/Beauty",
-    "depends": ["base", "mail", "sale_management"],
+    "depends": ["base", "mail", "sale_management", "website"],
     "data": [
         "security/ir.model.access.csv",
         "data/beauty_sequence.xml",
@@ -27,6 +27,7 @@ Gestión sencilla para salones de uñas y cejas:
         "views/beauty_technician_views.xml",
         "views/beauty_appointment_views.xml",
         "views/res_partner_views.xml",
+        "views/beauty_booking_templates.xml",
         "views/beauty_menus.xml",
     ],
     "demo": [
@@ -35,4 +36,12 @@ Gestión sencilla para salones de uñas y cejas:
     "application": True,
     "installable": True,
     "license": "LGPL-3",
+    "assets": {
+        "web._assets_primary_variables": [
+            "beauty_salon/static/src/scss/beauty_variables.scss",
+        ],
+        "web.assets_frontend": [
+            "beauty_salon/static/src/scss/beauty_frontend.scss",
+        ],
+    },
 }

@@ -1,0 +1,6 @@
+// Tema azul cielo Ailid Manso — variables del backend (Odoo Community).
+// Debe cargarse DESPUÉS de las variables originales (bundle
+// web._assets_primary_variables), por eso se reasigna sin !default.
+$o-community-color: #4aa3d8;
+$o-brand-odoo: $o-community-color;
+$o-brand-primary: $o-community-color;

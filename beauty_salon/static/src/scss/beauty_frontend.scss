@@ -1,0 +1,227 @@
+// Tema salón Ailid Manso — página pública de reservas (/reservar).
+// Tipografías: Playfair Display (titulares) + Jost (texto), con
+// alternativas del sistema si no hay conexión a Google Fonts.
+$beauty-sky: #4aa3d8;
+$beauty-sky-dark: #2e7fa8;
+$beauty-sky-deep: #1f6e94;
+$beauty-sky-soft: #eaf5fb;
+$beauty-ink: #23414f;
+
+.beauty-hero {
+    background: linear-gradient(135deg, #8fd0ef 0%, $beauty-sky 45%, $beauty-sky-dark 100%);
+    color: #fff;
+    text-align: center;
+    padding: 3.5rem 1rem 4.5rem;
+    border-radius: 0 0 2.5rem 2.5rem;
+    box-shadow: 0 12px 32px rgba(46, 127, 168, 0.25);
+    margin-bottom: -2.5rem;
+    position: relative;
+    overflow: hidden;
+
+    &::after {
+        content: "";
+        position: absolute;
+        left: -10%;
+        right: -10%;
+        bottom: -2.2rem;
+        height: 4.5rem;
+        background: rgba(255, 255, 255, 0.18);
+        border-radius: 50%;
+    }
+
+    .beauty-hero-logo {
+        border-radius: 26px;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+        border: 3px solid rgba(255, 255, 255, 0.9);
+    }
+    .beauty-hero-brand {
+        font-family: "Jost", "Segoe UI", system-ui, sans-serif;
+        text-transform: uppercase;
+        letter-spacing: 0.35em;
+        font-size: 0.8rem;
+        opacity: 0.9;
+        margin: 1rem 0 0.4rem;
+    }
+    .beauty-hero-title {
+        font-family: "Playfair Display", Georgia, "Times New Roman", serif;
+        font-weight: 700;
+        font-size: clamp(2.2rem, 5vw, 3.4rem);
+        margin: 0;
+        text-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
+    }
+    .beauty-hero-sub {
+        font-family: "Jost", "Segoe UI", system-ui, sans-serif;
+        font-weight: 300;
+        font-size: 1.1rem;
+        opacity: 0.95;
+        margin: 0.5rem 0 0;
+    }
+}
+
+#beauty_booking {
+    font-family: "Jost", "Segoe UI", system-ui, -apple-system, sans-serif;
+    color: $beauty-ink;
+    position: relative;
+    z-index: 1;
+
+    .card {
+        border: none;
+        border-radius: 1.25rem;
+        box-shadow: 0 10px 28px rgba(35, 65, 79, 0.10);
+        border-top: 4px solid $beauty-sky;
+        overflow: hidden;
+
+        .card-title {
+            font-family: "Playfair Display", Georgia, serif;
+            font-size: 1.35rem;
+            color: $beauty-sky-deep;
+            margin-bottom: 1rem;
+        }
+    }
+
+    .form-check {
+        padding: 0.65rem 0.9rem;
+        border: 1px solid #d9ecf5;
+        border-radius: 0.9rem;
+        margin-bottom: 0.5rem;
+        transition: border-color 0.15s, background 0.15s;
+        &:hover {
+            border-color: $beauty-sky;
+            background: $beauty-sky-soft;
+        }
+        .form-check-label {
+            font-size: 1.05rem;
+            cursor: pointer;
+        }
+    }
+    .form-check-input:checked {
+        background-color: $beauty-sky;
+        border-color: $beauty-sky;
+    }
+    .form-select, .form-control {
+        border-radius: 0.9rem;
+        padding: 0.65rem 1rem;
+        font-size: 1.02rem;
+        &:focus {
+            border-color: $beauty-sky;
+            box-shadow: 0 0 0 0.25rem rgba(74, 163, 216, 0.2);
+        }
+    }
+    .form-label {
+        font-weight: 500;
+        color: $beauty-sky-deep;
+    }
+
+    #booking_days, #booking_slots {
+        gap: 0.6rem !important;
+    }
+    .btn-day, .btn-slot {
+        border-radius: 999px;
+        font-weight: 500;
+        padding: 0.55rem 1.05rem;
+        font-size: 1rem;
+        transition: transform 0.1s;
+        &:hover {
+            transform: translateY(-1px);
+        }
+    }
+    .btn-day.btn-outline-primary, .btn-slot.btn-outline-success {
+        color: $beauty-sky-deep;
+        border-color: $beauty-sky;
+        background: #fff;
+        &:hover {
+            background: $beauty-sky-soft;
+            color: $beauty-sky-deep;
+        }
+    }
+    .btn-day.btn-primary, .btn-slot.btn-success {
+        background: linear-gradient(135deg, $beauty-sky, $beauty-sky-dark);
+        border-color: $beauty-sky-dark;
+        box-shadow: 0 6px 16px rgba(46, 127, 168, 0.35);
+    }
+
+    button[type="submit"].btn-primary {
+        background: linear-gradient(135deg, $beauty-sky, $beauty-sky-dark);
+        border: none;
+        border-radius: 999px;
+        font-size: 1.2rem;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+        padding: 0.9rem;
+        box-shadow: 0 10px 24px rgba(46, 127, 168, 0.4);
+        &:hover {
+            filter: brightness(1.05);
+        }
+    }
+}
+
+@media (max-width: 576px) {
+    .beauty-hero {
+        padding: 2.5rem 1rem 4rem;
+        border-radius: 0 0 1.75rem 1.75rem;
+    }
+}
+
+// Página de confirmación.
+.beauty-hero-ok {
+    padding-bottom: 5rem;
+    .beauty-ok-check {
+        width: 84px;
+        height: 84px;
+        margin: 0 auto 1rem;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.95);
+        color: $beauty-sky-dark;
+        font-size: 2.6rem;
+        font-weight: 600;
+        line-height: 84px;
+        box-shadow: 0 10px 26px rgba(0, 0, 0, 0.2);
+    }
+}
+
+#beauty_booking_ok {
+    font-family: "Jost", "Segoe UI", system-ui, -apple-system, sans-serif;
+    color: $beauty-ink;
+    margin-top: -2.5rem;
+    position: relative;
+    z-index: 1;
+
+    .card {
+        border: none;
+        border-radius: 1.25rem;
+        box-shadow: 0 10px 28px rgba(35, 65, 79, 0.10);
+        border-top: 4px solid $beauty-sky;
+    }
+    .beauty-ok-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 1rem;
+        padding: 0.7rem 0.25rem;
+        font-size: 1.08rem;
+        border-bottom: 1px dashed #d9ecf5;
+        &:last-child {
+            border-bottom: none;
+        }
+    }
+    .beauty-ok-label {
+        color: $beauty-sky-deep;
+        font-weight: 500;
+    }
+    .beauty-ok-logo {
+        border-radius: 12px;
+        margin-bottom: 1rem;
+        box-shadow: 0 4px 12px rgba(35, 65, 79, 0.15);
+    }
+    .btn-primary {
+        background: linear-gradient(135deg, $beauty-sky, $beauty-sky-dark);
+        border: none;
+        border-radius: 999px;
+        font-size: 1.15rem;
+        font-weight: 600;
+        padding: 0.8rem 2.5rem;
+        box-shadow: 0 10px 24px rgba(46, 127, 168, 0.4);
+        &:hover {
+            filter: brightness(1.05);
+        }
+    }
+}

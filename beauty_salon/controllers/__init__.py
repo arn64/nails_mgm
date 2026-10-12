@@ -1,0 +1,3 @@
+# Part of Nails MGM. See LICENSE file for full copyright and licensing details.
+
+from . import beauty_booking
