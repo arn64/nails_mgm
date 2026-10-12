@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="demo_technician_1" model="beauty.technician">
+        <field name="name">María García</field>
+        <field name="phone">600 111 222</field>
+        <field name="email">maria@ejemplo.com</field>
+        <field name="commission_rate">10.0</field>
+    </record>
+    <record id="demo_technician_2" model="beauty.technician">
+        <field name="name">Lucía Fernández</field>
+        <field name="phone">600 333 444</field>
+        <field name="email">lucia@ejemplo.com</field>
+        <field name="commission_rate">12.0</field>
+    </record>
+
+    <record id="demo_partner_1" model="res.partner">
+        <field name="name">Ana López</field>
+        <field name="phone">611 000 111</field>
+        <field name="email">ana@ejemplo.com</field>
+        <field name="is_company">False</field>
+        <field name="allergies">Alergia al látex</field>
+        <field name="beauty_preferences">Prefiere almendra y tonos nude</field>
+    </record>
+</odoo>

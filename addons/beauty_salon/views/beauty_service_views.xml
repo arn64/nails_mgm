@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_beauty_service_list" model="ir.ui.view">
+        <field name="name">beauty.service.list</field>
+        <field name="model">beauty.service</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="name"/>
+                <field name="service_type"/>
+                <field name="list_price"/>
+                <field name="currency_id" column_invisible="True"/>
+                <field name="duration" widget="float_time"/>
+                <field name="appointment_count"/>
+                <field name="active" invisible="1"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_beauty_service_form" model="ir.ui.view">
+        <field name="name">beauty.service.form</field>
+        <field name="model">beauty.service</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_view_appointments" type="object" class="oe_stat_button" icon="fa-calendar">
+                            <field name="appointment_count" string="Citas" widget="statinfo"/>
+                        </button>
+                    </div>
+                    <field name="image" widget="image" class="oe_avatar"/>
+                    <div class="oe_title">
+                        <h1><field name="name" placeholder="Nombre del servicio"/></h1>
+                    </div>
+                    <group>
+                        <group string="General">
+                            <field name="service_type"/>
+                            <field name="list_price"/>
+                            <field name="duration" widget="float_time"/>
+                            <field name="product_id"/>
+                            <field name="active"/>
+                        </group>
+                        <group string="Estadísticas">
+                            <field name="appointment_count" readonly="1"/>
+                        </group>
+                    </group>
+                    <group string="Descripción">
+                        <field name="description" nolabel="1" placeholder="Describe el servicio..."/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_beauty_service_kanban" model="ir.ui.view">
+        <field name="name">beauty.service.kanban</field>
+        <field name="model">beauty.service</field>
+        <field name="arch" type="xml">
+            <kanban>
+                <field name="name"/>
+                <field name="service_type"/>
+                <field name="list_price"/>
+                <field name="currency_id"/>
+                <field name="color"/>
+                <templates>
+                    <t t-name="card">
+                        <div class="oe_kanban_global_click o_kanban_record_has_image">
+                            <div class="o_kanban_image"><field name="image" widget="image" alt="Servicio"/></div>
+                            <div class="oe_kanban_details">
+                                <strong><field name="name"/></strong>
+                                <div><field name="service_type"/></div>
+                                <div><field name="list_price"/> · <field name="duration" widget="float_time"/></div>
+                            </div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <record id="view_beauty_service_search" model="ir.ui.view">
+        <field name="name">beauty.service.search</field>
+        <field name="model">beauty.service</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <filter name="nails" string="Uñas" domain="[('service_type','=','nails')]"/>
+                <filter name="brows" string="Cejas" domain="[('service_type','=','brows')]"/>
+                <filter name="combo" string="Combinados" domain="[('service_type','=','combo')]"/>
+                <filter name="archived" string="Archivados" domain="[('active','=',False)]"/>
+                <group>
+                    <filter name="by_type" string="Tipo" context="{'group_by':'service_type'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_beauty_service" model="ir.actions.act_window">
+        <field name="name">Servicios</field>
+        <field name="res_model">beauty.service</field>
+        <field name="view_mode">kanban,list,form</field>
+    </record>
+</odoo>

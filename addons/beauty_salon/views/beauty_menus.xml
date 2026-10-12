@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem id="menu_beauty_root" name="Salón de Belleza" sequence="30"/>
+
+    <menuitem id="menu_beauty_appointments" name="Citas" parent="menu_beauty_root" action="action_beauty_appointment" sequence="10"/>
+    <menuitem id="menu_beauty_clients" name="Clientas" parent="menu_beauty_root" action="action_beauty_clients" sequence="15"/>
+    <menuitem id="menu_beauty_services" name="Servicios" parent="menu_beauty_root" action="action_beauty_service" sequence="20"/>
+    <menuitem id="menu_beauty_technicians" name="Técnicas" parent="menu_beauty_root" action="action_beauty_technician" sequence="30"/>
+</odoo>

@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_beauty_appointment_list" model="ir.ui.view">
+        <field name="name">beauty.appointment.list</field>
+        <field name="model">beauty.appointment</field>
+        <field name="arch" type="xml">
+            <list decoration-muted="state=='cancelled'" decoration-success="state=='done'" decoration-info="state=='confirmed'">
+                <field name="name"/>
+                <field name="partner_id"/>
+                <field name="technician_id"/>
+                <field name="start_datetime"/>
+                <field name="end_datetime"/>
+                <field name="service_type_display" string="Tipo"/>
+                <field name="amount_total"/>
+                <field name="state" widget="badge" decoration-success="state=='done'" decoration-info="state=='confirmed'" decoration-muted="state=='cancelled'"/>
+                <field name="sale_order_id" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_beauty_appointment_form" model="ir.ui.view">
+        <field name="name">beauty.appointment.form</field>
+        <field name="model">beauty.appointment</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button name="action_confirm" type="object" string="Confirmar" class="oe_highlight" invisible="state != 'draft'"/>
+                    <button name="action_done" type="object" string="Marcar realizada" class="oe_highlight" invisible="state != 'confirmed'"/>
+                    <button name="action_create_sale_order" type="object" string="Crear pedido" invisible="sale_order_id or state not in ('confirmed','done')"/>
+                    <button name="action_cancel" type="object" string="Cancelar" invisible="state in ('done','cancelled')"/>
+                    <button name="action_draft" type="object" string="Volver a borrador" invisible="state != 'cancelled'"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,confirmed,done,cancelled"/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_view_sale_order" type="object" class="oe_stat_button" icon="fa-shopping-cart" invisible="not sale_order_id">
+                            <div class="o_stat_info"><span class="o_stat_text">Pedido de venta</span></div>
+                        </button>
+                    </div>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group string="Cita">
+                            <field name="partner_id" context="{'default_is_company': False}"/>
+                            <field name="partner_phone" readonly="1"/>
+                            <field name="technician_id"/>
+                            <field name="user_id"/>
+                        </group>
+                        <group string="Fecha y precio">
+                            <field name="start_datetime"/>
+                            <field name="duration" widget="float_time"/>
+                            <field name="end_datetime"/>
+                            <field name="amount_total" readonly="1"/>
+                            <field name="sale_order_id" readonly="1" invisible="not sale_order_id"/>
+                        </group>
+                    </group>
+                    <group string="Servicios">
+                        <field name="service_ids" widget="many2many_checkboxes" nolabel="1"/>
+                    </group>
+                    <group string="Notas">
+                        <field name="notes" nolabel="1" placeholder="Alergias, preferencias, diseños..."/>
+                    </group>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_beauty_appointment_calendar" model="ir.ui.view">
+        <field name="name">beauty.appointment.calendar</field>
+        <field name="model">beauty.appointment</field>
+        <field name="arch" type="xml">
+            <calendar date_start="start_datetime" date_stop="end_datetime" color="technician_id" mode="week" quick_create="False">
+                <field name="partner_id"/>
+                <field name="technician_id"/>
+                <field name="state"/>
+            </calendar>
+        </field>
+    </record>
+
+    <record id="view_beauty_appointment_kanban" model="ir.ui.view">
+        <field name="name">beauty.appointment.kanban</field>
+        <field name="model">beauty.appointment</field>
+        <field name="arch" type="xml">
+            <kanban default_group_by="state">
+                <field name="name"/>
+                <field name="partner_id"/>
+                <field name="technician_id"/>
+                <field name="start_datetime"/>
+                <field name="amount_total"/>
+                <field name="state"/>
+                <templates>
+                    <t t-name="card">
+                        <div class="oe_kanban_global_click">
+                            <div class="oe_kanban_details">
+                                <strong><field name="name"/></strong>
+                                <div><field name="partner_id"/></div>
+                                <div><field name="technician_id"/></div>
+                                <div><field name="start_datetime"/></div>
+                                <div><field name="amount_total"/></div>
+                            </div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <record id="view_beauty_appointment_search" model="ir.ui.view">
+        <field name="name">beauty.appointment.search</field>
+        <field name="model">beauty.appointment</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <field name="partner_id"/>
+                <field name="technician_id"/>
+                <filter name="draft" string="Borrador" domain="[('state','=','draft')]"/>
+                <filter name="confirmed" string="Confirmadas" domain="[('state','=','confirmed')]"/>
+                <filter name="done" string="Realizadas" domain="[('state','=','done')]"/>
+                <filter name="today" string="Hoy" domain="[('start_datetime','&gt;=', (context_today()).strftime('%Y-%m-%d 00:00:00')), ('start_datetime','&lt;=', (context_today()).strftime('%Y-%m-%d 23:59:59'))]"/>
+                <group>
+                    <filter name="by_tech" string="Técnica" context="{'group_by':'technician_id'}"/>
+                    <filter name="by_state" string="Estado" context="{'group_by':'state'}"/>
+                    <filter name="by_day" string="Día" context="{'group_by':'start_datetime:day'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_beauty_appointment" model="ir.actions.act_window">
+        <field name="name">Citas</field>
+        <field name="res_model">beauty.appointment</field>
+        <field name="view_mode">list,form,calendar,kanban</field>
+    </record>
+</odoo>

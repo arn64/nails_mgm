@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <!-- Uñas -->
+    <record id="service_manicura_clasica" model="beauty.service">
+        <field name="name">Manicura clásica</field>
+        <field name="service_type">nails</field>
+        <field name="list_price">20.0</field>
+        <field name="duration">1.0</field>
+        <field name="description">Limado, cutícula, hidratación y esmaltado normal.</field>
+    </record>
+    <record id="service_semipermanente" model="beauty.service">
+        <field name="name">Semipermanente</field>
+        <field name="service_type">nails</field>
+        <field name="list_price">30.0</field>
+        <field name="duration">1.25</field>
+        <field name="description">Esmaltado semipermanente con preparación y acabado.</field>
+    </record>
+    <record id="service_acrilicas" model="beauty.service">
+        <field name="name">Uñas acrílicas (set completo)</field>
+        <field name="service_type">nails</field>
+        <field name="list_price">45.0</field>
+        <field name="duration">2.0</field>
+        <field name="description">Set completo de acrílicas con forma y largo a elegir.</field>
+    </record>
+    <record id="service_pedicura" model="beauty.service">
+        <field name="name">Pedicura completa</field>
+        <field name="service_type">nails</field>
+        <field name="list_price">28.0</field>
+        <field name="duration">1.0</field>
+        <field name="description">Cuidado de pies, durezas y esmaltado.</field>
+    </record>
+    <!-- Cejas -->
+    <record id="service_diseno_cejas" model="beauty.service">
+        <field name="name">Diseño de cejas</field>
+        <field name="service_type">brows</field>
+        <field name="list_price">15.0</field>
+        <field name="duration">0.5</field>
+        <field name="description">Medición, perfilado con pinza/hilo y acabado.</field>
+    </record>
+    <record id="service_tinte_cejas" model="beauty.service">
+        <field name="name">Tinte de cejas</field>
+        <field name="service_type">brows</field>
+        <field name="list_price">12.0</field>
+        <field name="duration">0.5</field>
+        <field name="description">Tinte para dar densidad y definir la forma.</field>
+    </record>
+    <record id="service_laminado_cejas" model="beauty.service">
+        <field name="name">Laminado de cejas</field>
+        <field name="service_type">brows</field>
+        <field name="list_price">35.0</field>
+        <field name="duration">1.0</field>
+        <field name="description">Laminado + diseño para cejas peinadas y fijadas.</field>
+    </record>
+    <!-- Combinado -->
+    <record id="service_combo_manos_cejas" model="beauty.service">
+        <field name="name">Pack manos + cejas</field>
+        <field name="service_type">combo</field>
+        <field name="list_price">40.0</field>
+        <field name="duration">1.5</field>
+        <field name="description">Semipermanente + diseño de cejas.</field>
+    </record>
+</odoo>

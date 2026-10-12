@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_beauty_technician_list" model="ir.ui.view">
+        <field name="name">beauty.technician.list</field>
+        <field name="model">beauty.technician</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="name"/>
+                <field name="phone"/>
+                <field name="commission_rate"/>
+                <field name="appointment_count"/>
+                <field name="done_amount_total"/>
+                <field name="commission_amount"/>
+                <field name="currency_id" column_invisible="True"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_beauty_technician_form" model="ir.ui.view">
+        <field name="name">beauty.technician.form</field>
+        <field name="model">beauty.technician</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_view_appointments" type="object" class="oe_stat_button" icon="fa-calendar">
+                            <field name="appointment_count" string="Citas" widget="statinfo"/>
+                        </button>
+                    </div>
+                    <div class="oe_title">
+                        <h1><field name="name" placeholder="Nombre de la técnica"/></h1>
+                    </div>
+                    <group>
+                        <group string="Contacto">
+                            <field name="phone"/>
+                            <field name="email"/>
+                            <field name="user_id"/>
+                        </group>
+                        <group string="Salón">
+                            <field name="commission_rate"/>
+                            <field name="appointment_count" readonly="1"/>
+                            <field name="done_amount_total" readonly="1"/>
+                            <field name="commission_amount" readonly="1"/>
+                            <field name="active"/>
+                        </group>
+                    </group>
+                    <group string="Notas">
+                        <field name="notes" nolabel="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_beauty_technician_search" model="ir.ui.view">
+        <field name="name">beauty.technician.search</field>
+        <field name="model">beauty.technician</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_beauty_technician" model="ir.actions.act_window">
+        <field name="name">Técnicas</field>
+        <field name="res_model">beauty.technician</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>
