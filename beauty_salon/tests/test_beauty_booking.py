@@ -220,7 +220,13 @@ class TestBeautyBooking(TransactionCase):
             technician_id=self.technician.id,
         )
         self.assertEqual(appt.state, "to_confirm")
-        self.assertIn("America/New_York", appt.booking_local_display)
+        # Sin sufijo de zona (app solo Cuba): verifica la hora local de NY.
+        self.assertTrue(
+            appt.booking_local_display.startswith(
+                day.strftime("%d/%m/%Y") + " 10:00 am"
+            ),
+            appt.booking_local_display,
+        )
 
     def test_cron_marks_past_confirmed_as_done(self):
         past = self.env["beauty.appointment"].create({
@@ -243,6 +249,12 @@ class TestBeautyBooking(TransactionCase):
         self.assertIn(past, done)
         self.assertEqual(past.state, "done")
         self.assertEqual(future.state, "confirmed")
+
+    def test_technician_view_fields_load(self):
+        # Reproduce fields_get de la vista (fallaba _tz_selection sin arg).
+        desc = self.env["beauty.technician"].fields_get(["tz"])
+        self.assertTrue(desc["tz"]["selection"])
+        self.env["beauty.service"].fields_get(["schedule"])
 
     def test_request_then_confirm_flow_and_whatsapp(self):
         day, slots = self._next_workday()
@@ -346,3 +358,57 @@ class TestBeautyBooking(TransactionCase):
             ("id", "in", (first + second).ids),
         ])
         self.assertEqual([a.id for a in found], [second.id, first.id])
+
+    def test_linked_user_gets_notification_and_activity(self):
+        user = self.env["res.users"].create({
+            "name": "Técnica Real",
+            "login": "tecnica.real@test.local",
+            "email": "tecnica.real@test.local",
+            "group_ids": [(6, 0, [self.env.ref("base.group_user").id])],
+        })
+        self.technician.user_id = user
+        day, slots = self._next_workday()
+        appt = self.Appointment.create_public_booking(
+            name="Ana", phone="600111222", email="",
+            service_ids=self.service.ids,
+            start_utc_str=slots[0]["start_utc"],
+            technician_id=self.technician.id,
+        )
+        appt.action_confirm()
+        self.assertIn(
+            user.partner_id, appt.message_partner_ids,
+            "La técnica debe quedar suscrita para recibir la notificación",
+        )
+        activity = self.env["mail.activity"].search([
+            ("res_model", "=", "beauty.appointment"),
+            ("res_id", "=", appt.id),
+        ], limit=1)
+        self.assertEqual(activity.user_id, user)
+
+    def test_email_falls_back_to_linked_user(self):
+        user = self.env["res.users"].create({
+            "name": "Técnica Mail",
+            "login": "tecnica.mail@test.local",
+            "email": "usuario@test.local",
+            "group_ids": [(6, 0, [self.env.ref("base.group_user").id])],
+        })
+        self.technician.email = False
+        self.technician.user_id = user
+        day, slots = self._next_workday()
+        appt = self.Appointment.create_public_booking(
+            name="Ana", phone="600111222", email="",
+            service_ids=self.service.ids,
+            start_utc_str=slots[0]["start_utc"],
+            technician_id=self.technician.id,
+        )
+        self.assertEqual(appt.technician_notify_email, "usuario@test.local")
+        mail = self.env["mail.mail"].search([
+            ("model", "=", "beauty.appointment"),
+            ("res_id", "=", appt.id),
+        ], limit=1)
+        self.assertTrue(mail, "Debe encolarse el aviso al usuario vinculado")
+        addressed = (
+            "usuario@test.local" in (mail.email_to or "")
+            or user.partner_id in mail.recipient_ids
+        )
+        self.assertTrue(addressed, "Debe ir dirigido al usuario vinculado")

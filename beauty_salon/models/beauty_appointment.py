@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 
 import pytz
 import requests
+from markupsafe import Markup
 
 from odoo import api, fields, models
 from odoo.exceptions import UserError, ValidationError
@@ -88,6 +89,11 @@ class BeautyAppointment(models.Model):
         string="Horario (zona de la técnica)",
         compute="_compute_booking_local_display",
     )
+    technician_notify_email = fields.Char(
+        string="Email de aviso",
+        compute="_compute_technician_notify_email",
+        help="Email de la técnica o, si no tiene, de su usuario vinculado.",
+    )
 
     @api.depends("service_ids", "service_ids.list_price")
     def _compute_amount_total(self):
@@ -127,6 +133,13 @@ class BeautyAppointment(models.Model):
             if end:
                 text += f" – {fmt(end)}"
             appt.booking_local_display = f"{text}"
+
+    @api.depends("technician_id", "technician_id.email", "technician_id.user_id.email")
+    def _compute_technician_notify_email(self):
+        for appt in self:
+            appt.technician_notify_email = (
+                appt.technician_id.email or appt.technician_id.user_id.email or False
+            )
 
     @api.depends("start_datetime", "duration")
     def _compute_end_datetime(self):
@@ -218,7 +231,7 @@ class BeautyAppointment(models.Model):
         if not template:
             return
         for appt in self.sudo():
-            if not appt.technician_id.email:
+            if not appt.technician_notify_email:
                 _logger.debug("Aviso técnica omitido %s: sin email", appt.name)
                 continue
             try:
@@ -246,7 +259,7 @@ class BeautyAppointment(models.Model):
         for appt in self:
             partners = appt.technician_id.user_id.partner_id
             appt.message_post(
-                body=(
+                body=Markup(
                     f"<b>{title}:</b> {intro}<br/>"
                     f"<b>{appt.service_names_display}</b> "
                     f"para <b>{appt.partner_id.name}</b> "

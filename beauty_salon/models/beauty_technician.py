@@ -6,8 +6,9 @@ from odoo import api, fields, models
 from odoo.exceptions import ValidationError
 
 
-def _tz_selection():
+def _tz_selection(model):
     # Igual que en res.users: Etc/* al final para no confundir.
+    # Recibe el modelo porque Odoo llama a selection(modelo).
     return [
         (tz, tz)
         for tz in sorted(

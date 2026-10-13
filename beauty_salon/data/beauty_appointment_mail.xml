@@ -4,29 +4,29 @@
         <field name="name">Cita: aviso a la técnica</field>
         <field name="model_id" ref="beauty_salon.model_beauty_appointment"/>
         <field name="subject">Nueva cita {{ object.name }} — {{ object.partner_id.name }}</field>
-        <field name="email_to">{{ object.technician_id.email }}</field>
+        <field name="email_to">{{ object.technician_notify_email }}</field>
         <field name="use_default_to" eval="False"/>
         <field name="auto_delete" eval="True"/>
         <field name="body_html"><![CDATA[
 <div style="font-family: Arial, Helvetica, sans-serif; color: #23414f; max-width: 560px;">
-  <div style="background: linear-gradient(135deg, #8fd0ef, #2e7fa8); color: #fff; padding: 20px 24px; border-radius: 12px 12px 0 0;">
+  <div style="background-color: #4aa3d8; color: #ffffff; padding: 20px 24px; border-radius: 12px 12px 0 0;">
     <div style="font-size: 12px; letter-spacing: 3px;">AILID MANSO · SALÓN DE BELLEZA</div>
-    <div style="font-size: 24px; font-weight: bold;">Tienes una nueva cita, {{ object.technician_id.name }}</div>
+    <div style="font-size: 24px; font-weight: bold;">Tienes una nueva cita, <t t-out="object.technician_id.name"/></div>
   </div>
   <div style="border: 1px solid #d9ecf5; border-top: none; padding: 20px 24px; border-radius: 0 0 12px 12px;">
-    <p>Hola {{ object.technician_id.name }},</p>
+    <p>Hola <t t-out="object.technician_id.name"/>,</p>
     <p>Se ha agendado una nueva cita a tu nombre con estos datos:</p>
     <ul>
-      <li><strong>Referencia:</strong> {{ object.name }}</li>
-      <li><strong>Clienta:</strong> {{ object.partner_id.name }}</li>
-      <li><strong>Teléfono:</strong> {{ object.partner_id.phone or '-' }}</li>
-      <li><strong>Correo:</strong> {{ object.partner_id.email or '-' }}</li>
-      <li><strong>Servicios:</strong> {{ object.service_names_display }}</li>
-      <li><strong>Horario:</strong> {{ object.booking_local_display }}</li>
-      <li><strong>Duración:</strong> {{ object.duration }} h</li>
+      <li><strong>Referencia:</strong> <t t-out="object.name"/></li>
+      <li><strong>Clienta:</strong> <t t-out="object.partner_id.name"/></li>
+      <li><strong>Teléfono:</strong> <t t-out="object.partner_id.phone or '-'"/></li>
+      <li><strong>Correo:</strong> <t t-out="object.partner_id.email or '-'"/></li>
+      <li><strong>Servicios:</strong> <t t-out="object.service_names_display"/></li>
+      <li><strong>Horario:</strong> <t t-out="object.booking_local_display"/></li>
+      <li><strong>Duración:</strong> <t t-out="object.duration"/> h</li>
     </ul>
-    <p>Notas: {{ object.notes or '-' }}</p>
-    <p style="color: #888; font-size: 12px;">Puedes ver el detalle en el sistema: Citas / {{ object.name }}</p>
+    <p>Notas: <t t-out="object.notes or '-'"/></p>
+    <p style="color: #888; font-size: 12px;">Puedes ver el detalle en el sistema: Citas / <t t-out="object.name"/></p>
   </div>
 </div>
         ]]></field>
