@@ -38,6 +38,7 @@
                         </group>
                         <group string="Salón">
                             <field name="commission_rate"/>
+                            <field name="tz"/>
                             <field name="appointment_count" readonly="1"/>
                             <field name="done_amount_total" readonly="1"/>
                             <field name="commission_amount" readonly="1"/>

@@ -1,6 +1,7 @@
 # Part of Nails MGM. See LICENSE file for full copyright and licensing details.
 
 import base64
+from urllib.parse import quote
 
 from odoo import http
 from odoo.exceptions import ValidationError
@@ -133,9 +134,25 @@ class BeautyBookingController(http.Controller):
         except ValidationError as err:
             values["error"] = str(err).replace("None - ", "")
             return request.render("beauty_salon.beauty_booking_page", values)
+        salon_number = "".join(
+            c for c in (
+                request.env["ir.config_parameter"].sudo().get_param(
+                    "beauty_salon.whatsapp_number", ""
+                ) or ""
+            ) if c.isdigit()
+        )
+        whatsapp_url = None
+        if salon_number:
+            text = (
+                f"Hola {appointment.company_id.name or 'salón'}, "
+                f"soy {appointment.partner_id.name} y confirmo mi reserva "
+                f"{appointment.name} de {appointment.service_names_display}."
+            )
+            whatsapp_url = f"https://wa.me/{salon_number}?text={quote(text)}"
         return request.render("beauty_salon.beauty_booking_ok", {
             "appointment": appointment,
             "services": appointment.service_ids,
+            "whatsapp_url": whatsapp_url,
         })
 
     @http.route("/reservar/catalogo", type="http", auth="public", website=True, methods=["GET"])
@@ -153,6 +170,39 @@ class BeautyBookingController(http.Controller):
             "services": services,
             "service_ids": service_ids,
             "back_url": back_url,
+        })
+
+    @http.route("/reservar/mis-reservas", type="http", auth="public", website=True, methods=["GET"])
+    def booking_mine(self, **kw):
+        """Consulta de reservas por teléfono (campo obligatorio)."""
+        phone = (kw.get("phone") or "").strip()
+        digits = "".join(c for c in phone if c.isdigit())
+        appointments, error = [], None
+        if "phone" in kw:
+            if len(digits) < 6:
+                error = "Indica un teléfono válido para buscar tus reservas."
+            else:
+                Partner = request.env["res.partner"].sudo()
+                partners = Partner.search(
+                    [("is_company", "=", False), ("phone", "!=", False)]
+                ).filtered(
+                    lambda p: "".join(c for c in (p.phone or "") if c.isdigit()) == digits
+                    or digits in "".join(c for c in (p.phone or "") if c.isdigit())
+                )
+                if not partners:
+                    error = "No encontramos reservas con ese teléfono."
+                else:
+                    appointments = request.env["beauty.appointment"].sudo().search(
+                        [("partner_id", "in", partners.ids)],
+                        order="start_datetime desc",
+                        limit=50,
+                    )
+                    if not appointments:
+                        error = "No encontramos reservas con ese teléfono."
+        return request.render("beauty_salon.beauty_booking_mine", {
+            "phone": phone,
+            "appointments": appointments,
+            "error": error,
         })
 
     @http.route("/reservar/servicio/<int:service_id>/imagen", type="http", auth="public")

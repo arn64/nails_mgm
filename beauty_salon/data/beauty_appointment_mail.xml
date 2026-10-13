@@ -22,7 +22,7 @@
       <li><strong>Teléfono:</strong> {{ object.partner_id.phone or '-' }}</li>
       <li><strong>Correo:</strong> {{ object.partner_id.email or '-' }}</li>
       <li><strong>Servicios:</strong> {{ object.service_names_display }}</li>
-      <li><strong>Inicio:</strong> {{ object.start_datetime }} (hora del sistema)</li>
+      <li><strong>Horario:</strong> {{ object.booking_local_display }}</li>
       <li><strong>Duración:</strong> {{ object.duration }} h</li>
     </ul>
     <p>Notas: {{ object.notes or '-' }}</p>

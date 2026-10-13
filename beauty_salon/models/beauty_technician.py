@@ -1,7 +1,19 @@
 # Part of Nails MGM. See LICENSE file for full copyright and licensing details.
 
+import pytz
+
 from odoo import api, fields, models
 from odoo.exceptions import ValidationError
+
+
+def _tz_selection():
+    # Igual que en res.users: Etc/* al final para no confundir.
+    return [
+        (tz, tz)
+        for tz in sorted(
+            pytz.all_timezones, key=lambda tz: tz if not tz.startswith("Etc/") else "_"
+        )
+    ]
 
 
 class BeautyTechnician(models.Model):
@@ -13,6 +25,13 @@ class BeautyTechnician(models.Model):
     phone = fields.Char()
     email = fields.Char()
     user_id = fields.Many2one("res.users", string="Usuario vinculado")
+    tz = fields.Selection(
+        selection=_tz_selection,
+        string="Zona horaria",
+        default="America/Havana",
+        help="Zona horaria de la técnica. La reserva web muestra y valida "
+             "los horarios en esta zona. Vacío = hora del salón (Cuba).",
+    )
     commission_rate = fields.Float(
         string="Comisión (%)",
         default=0.0,

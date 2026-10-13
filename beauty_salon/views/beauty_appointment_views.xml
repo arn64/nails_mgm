@@ -4,13 +4,14 @@
         <field name="name">beauty.appointment.list</field>
         <field name="model">beauty.appointment</field>
         <field name="arch" type="xml">
-            <list decoration-muted="state=='cancelled'" decoration-success="state=='done'" decoration-info="state=='confirmed'">
+            <list decoration-muted="state=='cancelled'" decoration-success="state=='done'" decoration-info="state=='confirmed'" decoration-warning="state=='to_confirm'">
                 <field name="name"/>
                 <field name="partner_id"/>
                 <field name="technician_id"/>
                 <field name="start_datetime"/>
                 <field name="end_datetime"/>
                 <field name="service_type_display" string="Tipo"/>
+                <field name="service_ids" widget="many2many_tags"/>
                 <field name="amount_total"/>
                 <field name="state" widget="badge" decoration-success="state=='done'" decoration-info="state=='confirmed'" decoration-muted="state=='cancelled'"/>
                 <field name="sale_order_id" optional="hide"/>
@@ -24,12 +25,14 @@
         <field name="arch" type="xml">
             <form>
                 <header>
-                    <button name="action_confirm" type="object" string="Confirmar" class="oe_highlight" invisible="state != 'draft'"/>
+                    <button name="action_request_confirmation" type="object" string="Solicitar confirmación" class="oe_highlight" invisible="state != 'draft'"/>
+                    <button name="action_confirm" type="object" string="Confirmar" class="oe_highlight" invisible="state not in ('draft','to_confirm')"/>
+                    <button name="action_open_whatsapp" type="object" string="WhatsApp" invisible="not partner_phone"/>
                     <button name="action_done" type="object" string="Marcar realizada" class="oe_highlight" invisible="state != 'confirmed'"/>
                     <button name="action_create_sale_order" type="object" string="Crear pedido" invisible="sale_order_id or state not in ('confirmed','done')"/>
                     <button name="action_cancel" type="object" string="Cancelar" invisible="state in ('done','cancelled')"/>
                     <button name="action_draft" type="object" string="Volver a borrador" invisible="state != 'cancelled'"/>
-                    <field name="state" widget="statusbar" statusbar_visible="draft,confirmed,done,cancelled"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,to_confirm,confirmed,done,cancelled"/>
                 </header>
                 <sheet>
                     <div class="oe_button_box" name="button_box">
@@ -117,6 +120,7 @@
                 <field name="partner_id"/>
                 <field name="technician_id"/>
                 <filter name="draft" string="Borrador" domain="[('state','=','draft')]"/>
+                <filter name="to_confirm" string="Por confirmar" domain="[('state','=','to_confirm')]"/>
                 <filter name="confirmed" string="Confirmadas" domain="[('state','=','confirmed')]"/>
                 <filter name="done" string="Realizadas" domain="[('state','=','done')]"/>
                 <filter name="archived" string="Archivadas" domain="[('active','=',False)]"/>

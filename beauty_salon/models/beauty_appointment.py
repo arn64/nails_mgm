@@ -4,6 +4,7 @@ import logging
 from datetime import datetime, timedelta
 
 import pytz
+import requests
 
 from odoo import api, fields, models
 from odoo.exceptions import UserError, ValidationError
@@ -14,7 +15,7 @@ _logger = logging.getLogger(__name__)
 class BeautyAppointment(models.Model):
     _name = "beauty.appointment"
     _description = "Cita de uñas / cejas"
-    _order = "start_datetime desc"
+    _order = "create_date desc, id desc"
     _inherit = ["mail.thread", "mail.activity.mixin"]
 
     name = fields.Char(
@@ -27,7 +28,7 @@ class BeautyAppointment(models.Model):
         tracking=True,
         domain=[("is_company", "=", False)],
     )
-    partner_phone = fields.Char(related="partner_id.phone", readonly=True)
+    partner_phone = fields.Char(string="Teléfono", related="partner_id.phone", readonly=True)
     service_ids = fields.Many2many(
         "beauty.service",
         "beauty_appointment_service_rel",
@@ -60,6 +61,7 @@ class BeautyAppointment(models.Model):
     state = fields.Selection(
         [
             ("draft", "Borrador"),
+            ("to_confirm", "Por confirmar"),
             ("confirmed", "Confirmada"),
             ("done", "Realizada"),
             ("cancelled", "Cancelada"),
@@ -82,6 +84,10 @@ class BeautyAppointment(models.Model):
     service_names_display = fields.Char(
         string="Servicios (texto)", compute="_compute_service_names_display"
     )
+    booking_local_display = fields.Char(
+        string="Horario (zona de la técnica)",
+        compute="_compute_booking_local_display",
+    )
 
     @api.depends("service_ids", "service_ids.list_price")
     def _compute_amount_total(self):
@@ -99,6 +105,28 @@ class BeautyAppointment(models.Model):
     def _compute_service_names_display(self):
         for appt in self:
             appt.service_names_display = ", ".join(appt.service_ids.mapped("name"))
+
+    @api.depends("start_datetime", "end_datetime", "technician_id", "technician_id.tz")
+    def _compute_booking_local_display(self):
+        for appt in self:
+            if not appt.start_datetime:
+                appt.booking_local_display = ""
+                continue
+            tz = appt._booking_tz_for_technician(appt.technician_id)
+            start = pytz.utc.localize(appt.start_datetime).astimezone(tz)
+            end = (
+                pytz.utc.localize(appt.end_datetime).astimezone(tz)
+                if appt.end_datetime else None
+            )
+
+            def fmt(dt):
+                suffix = "am" if dt.hour < 12 else "pm"
+                return f"{dt.hour % 12 or 12}:{dt.minute:02d} {suffix}"
+
+            text = f"{start.strftime('%d/%m/%Y')} {fmt(start)}"
+            if end:
+                text += f" – {fmt(end)}"
+            appt.booking_local_display = f"{text}"
 
     @api.depends("start_datetime", "duration")
     def _compute_end_datetime(self):
@@ -153,11 +181,29 @@ class BeautyAppointment(models.Model):
         return appointments
 
     # --- Botones de estado ---
-    def action_confirm(self):
+    # Flujo: borrador -> por confirmar (reserva del cliente) -> confirmada
+    # (solo la confirma la técnica) o cancelada. Por atajo interno también
+    # se puede confirmar directo desde borrador.
+    def action_request_confirmation(self):
         if any(appt.state != "draft" for appt in self):
-            raise UserError("Solo se pueden confirmar citas en borrador.")
-        self.write({"state": "confirmed"})
+            raise UserError("Solo se puede solicitar confirmación en borrador.")
+        self.write({"state": "to_confirm"})
         self._notify_technician_email()
+        self._notify_technician_internal(
+            "Nueva solicitud de reserva",
+            "Hay una nueva reserva por revisar y confirmar.",
+            with_activity=False,
+        )
+
+    def action_confirm(self):
+        if any(appt.state not in ("draft", "to_confirm") for appt in self):
+            raise UserError("Solo se pueden confirmar citas pendientes.")
+        self.write({"state": "confirmed"})
+        self._notify_technician_internal(
+            "Cita confirmada",
+            "La cita quedó confirmada. Revisa los detalles.",
+        )
+        self._send_whatsapp_confirmation()
 
     def _notify_technician_email(self):
         """Avisa por correo a la técnica al confirmar la cita.
@@ -181,13 +227,131 @@ class BeautyAppointment(models.Model):
             except Exception as err:  # noqa: BLE001 - el aviso no bloquea
                 _logger.warning("No se pudo avisar a la técnica %s: %s", appt.name, err)
 
+    @api.model
+    def cron_mark_past_done(self):
+        """Marca como realizadas las citas confirmadas ya finalizadas."""
+        past = self.search([
+            ("state", "=", "confirmed"),
+            ("end_datetime", "<", fields.Datetime.now()),
+        ])
+        if past:
+            past.write({"state": "done"})
+            _logger.info("Citas marcadas como realizadas: %s", past.mapped("name"))
+        return past
+
+    def _notify_technician_internal(self, title="Cita confirmada",
+                                     intro="La cita quedó confirmada. Revisa los detalles.",
+                                     with_activity=True):
+        """Notificación en Odoo a la técnica (+ actividad opcional)."""
+        for appt in self:
+            partners = appt.technician_id.user_id.partner_id
+            appt.message_post(
+                body=(
+                    f"<b>{title}:</b> {intro}<br/>"
+                    f"<b>{appt.service_names_display}</b> "
+                    f"para <b>{appt.partner_id.name}</b> "
+                    f"({appt.booking_local_display})."
+                ),
+                partner_ids=partners.ids if partners else [],
+                subtype_xmlid="mail.mt_comment",
+            )
+            if not with_activity:
+                continue
+            responsible = appt.technician_id.user_id or appt.user_id
+            try:
+                appt.activity_schedule(
+                    "mail.mail_activity_data_call",
+                    date_deadline=appt.start_datetime.date()
+                    if appt.start_datetime else False,
+                    summary=f"Atender cita {appt.name} – {appt.partner_id.name}",
+                    note=(
+                        f"Servicios: {appt.service_names_display}\n"
+                        f"Horario: {appt.booking_local_display}\n"
+                        f"Teléfono: {appt.partner_id.phone or '-'}"
+                    ),
+                    user_id=responsible.id if responsible else False,
+                )
+            except Exception as err:  # noqa: BLE001 - no bloquea
+                _logger.warning(
+                    "No se pudo crear la actividad de %s: %s", appt.name, err
+                )
+
+    @api.model
+    def _booking_local_display_short(self, display):
+        """Horario sin la zona entre paréntesis (para mensajes cortos)."""
+        import re
+
+        return re.sub(r"\s*\([^)]*\)$", "", display or "")
+
+    @api.model
+    def _whatsapp_digits(self, phone):
+        """Dígitos para wa.me / API. En Cuba el móvil local de 8 dígitos
+        que empieza por 5 se completa con el código 53."""
+        digits = "".join(c for c in (phone or "") if c.isdigit())
+        if len(digits) == 8 and digits.startswith("5"):
+            digits = "53" + digits
+        return digits
+
+    def _send_whatsapp_confirmation(self):
+        """Envía por WhatsApp (API de Meta) el aviso de cita confirmada.
+
+        Requiere configurar en Parámetros del sistema:
+        beauty_salon.whatsapp_token y beauty_salon.whatsapp_phone_id.
+        Sin configuración se omite en silencio. Nunca bloquea.
+        """
+        params = self.env["ir.config_parameter"].sudo()
+        token = (params.get_param("beauty_salon.whatsapp_token", "") or "").strip()
+        phone_id = (params.get_param("beauty_salon.whatsapp_phone_id", "") or "").strip()
+        if not token or not phone_id:
+            _logger.debug("WhatsApp sin configurar; aviso omitido.")
+            return
+        for appt in self:
+            digits = self._whatsapp_digits(appt.partner_id.phone)
+            if len(digits) < 10:
+                _logger.warning("WhatsApp omitido %s: teléfono inválido.", appt.name)
+                continue
+            text = (
+                f"Hola {appt.partner_id.name}, tu cita {appt.name} de "
+                f"{appt.service_names_display} quedó confirmada: "
+                f"{self._booking_local_display_short(appt.booking_local_display)}. "
+                f"¡Te esperamos!"
+            )
+            try:
+                response = requests.post(
+                    f"https://graph.facebook.com/v22.0/{phone_id}/messages",
+                    headers={
+                        "Authorization": f"Bearer {token}",
+                        "Content-Type": "application/json",
+                    },
+                    json={
+                        "messaging_product": "whatsapp",
+                        "to": digits,
+                        "type": "text",
+                        "text": {"body": text},
+                    },
+                    timeout=15,
+                )
+                if response.status_code >= 400:
+                    _logger.warning(
+                        "WhatsApp falló %s: %s %s",
+                        appt.name, response.status_code, response.text[:200],
+                    )
+                else:
+                    _logger.info("WhatsApp enviado %s.", appt.name)
+                    appt.message_post(
+                        body="Aviso de confirmación enviado por WhatsApp.",
+                        subtype_xmlid="mail.mt_note",
+                    )
+            except Exception as err:  # noqa: BLE001 - no bloquea
+                _logger.warning("WhatsApp error %s: %s", appt.name, err)
+
     def action_done(self):
         if any(appt.state != "confirmed" for appt in self):
             raise UserError("Solo se pueden realizar citas confirmadas.")
         self.write({"state": "done"})
 
     def action_cancel(self):
-        if any(appt.state not in ("draft", "confirmed") for appt in self):
+        if any(appt.state not in ("draft", "to_confirm", "confirmed") for appt in self):
             raise UserError("Solo se pueden cancelar citas pendientes.")
         self.write({"state": "cancelled"})
 
@@ -240,6 +404,27 @@ class BeautyAppointment(models.Model):
             "res_id": order.id,
         }
 
+    # --- WhatsApp (gratuito, un clic) ---
+    def action_open_whatsapp(self):
+        """Abre el chat de WhatsApp con la clienta con texto ya redactado."""
+        self.ensure_one()
+        from urllib.parse import quote
+
+        digits = self._whatsapp_digits(self.partner_id.phone)
+        if len(digits) < 6:
+            raise UserError("La clienta no tiene un teléfono válido para WhatsApp.")
+        text = (
+            f"Hola {self.partner_id.name}, te escribimos de "
+            f"{self.company_id.name or 'el salón'} por tu reserva {self.name} "
+            f"de {self.service_names_display} "
+            f"({self._booking_local_display_short(self.booking_local_display)})."
+        )
+        return {
+            "type": "ir.actions.act_url",
+            "url": f"https://wa.me/{digits}?text={quote(text)}",
+            "target": "new",
+        }
+
     def action_view_sale_order(self):
         self.ensure_one()
         if not self.sale_order_id:
@@ -255,7 +440,7 @@ class BeautyAppointment(models.Model):
     # --- Reserva web pública ---
     # Horario del salón (hora local). Ventanas en minutos desde medianoche.
     # Ej.: (10:00-11:30) y (13:30-17:00). Ajusta aquí si cambia el horario.
-    BOOKING_TZ = "Europe/Madrid"
+    BOOKING_TZ = "America/Havana"
     BOOKING_WINDOWS = [(10 * 60, 11 * 60 + 30), (13 * 60 + 30, 17 * 60)]
     BOOKING_HOURS_LABEL = "10:00–11:30 am y 1:30–5:00 pm"
     # Ventana 0 = mañana, ventana 1 = tarde (índices de BOOKING_WINDOWS).
@@ -300,6 +485,15 @@ class BeautyAppointment(models.Model):
         return pytz.timezone(self.BOOKING_TZ)
 
     @api.model
+    def _booking_tz_for_technician(self, technician):
+        """Zona horaria de la técnica (o la del salón si no tiene)."""
+        name = (technician.tz if technician else None) or self.BOOKING_TZ
+        try:
+            return pytz.timezone(name)
+        except pytz.UnknownTimeZoneError:
+            return pytz.timezone(self.BOOKING_TZ)
+
+    @api.model
     def _booking_duration_for_services(self, services):
         duration = sum(services.mapped("duration")) if services else 0.0
         return duration or 1.0
@@ -341,7 +535,10 @@ class BeautyAppointment(models.Model):
         if not technicians:
             return []
 
-        tz = self._booking_tz()
+        if technician_id and len(technicians) == 1:
+            tz = self._booking_tz_for_technician(technicians[:1])
+        else:
+            tz = self._booking_tz()
         now_utc = datetime.now(pytz.utc).replace(tzinfo=None)
         min_start = now_utc + timedelta(minutes=self.BOOKING_MIN_ANTICIPATION_MINUTES)
 
@@ -421,16 +618,8 @@ class BeautyAppointment(models.Model):
         duration = self._booking_duration_for_services(services)
         end_utc = start_utc + timedelta(hours=duration)
 
-        # No permitir pasado ni fuera de horario Lun-Vie 10:00-11:30 y 13:30-17:00 (hora local).
-        tz = self._booking_tz()
-        local_start = pytz.utc.localize(start_utc).astimezone(tz)
-        if local_start.weekday() >= 5:
-            raise ValidationError("Solo reservamos de lunes a viernes.")
-        start_minutes = local_start.hour * 60 + local_start.minute
-        if not self._booking_slot_in_hours(start_minutes, duration, services):
-            raise ValidationError(
-                f"Ese horario está fuera del horario del salón ({self.BOOKING_HOURS_LABEL})."
-            )
+        # No permitir pasado ni fuera de horario (se valida en la zona
+        # de la técnica una vez asignada).
         if start_utc < datetime.now(pytz.utc).replace(tzinfo=None) + timedelta(
                 minutes=self.BOOKING_MIN_ANTICIPATION_MINUTES) - timedelta(minutes=1):
             raise ValidationError("Ese horario ya no está disponible.")
@@ -451,17 +640,35 @@ class BeautyAppointment(models.Model):
         if not chosen:
             raise ValidationError("Ese hueco acaba de ocuparse. Elige otro horario.")
 
-        partner = self.env["res.partner"].sudo().search(
-            [("phone", "=", phone), ("is_company", "=", False)], limit=1
-        )
-        if not partner:
-            partner = self.env["res.partner"].sudo().search(
-                [("phone", "ilike", phone), ("is_company", "=", False)], limit=1
+        # Ventanas y día laborable en la zona horaria de la técnica asignada.
+        tz = self._booking_tz_for_technician(chosen)
+        local_start = pytz.utc.localize(start_utc).astimezone(tz)
+        if local_start.weekday() >= 5:
+            raise ValidationError("Solo reservamos de lunes a viernes.")
+        start_minutes = local_start.hour * 60 + local_start.minute
+        if not self._booking_slot_in_hours(start_minutes, duration, services):
+            raise ValidationError(
+                f"Ese horario está fuera del horario del salón ({self.BOOKING_HOURS_LABEL})."
             )
-        if partner:
-            partner.sudo().write({"name": name, "phone": phone, "email": email or partner.email})
+
+        # Reutiliza la ficha solo si coincide nombre y teléfono: con el mismo
+        # teléfono pero otro nombre se crea una ficha nueva para no renombrar
+        # (y con ello "cambiar el nombre" de) las citas de otra clienta.
+        Partner = self.env["res.partner"].sudo()
+        candidates = Partner.search(
+            [("phone", "ilike", phone), ("is_company", "=", False)]
+        ).filtered(
+            lambda p: "".join(c for c in (p.phone or "") if c.isdigit()) == digits
+        )
+        same = candidates.filtered(
+            lambda p: (p.name or "").strip().casefold() == name.casefold()
+        )
+        if same:
+            partner = same[0]
+            if email and partner.email != email:
+                partner.write({"email": email})
         else:
-            partner = self.env["res.partner"].sudo().create({
+            partner = Partner.create({
                 "name": name, "phone": phone, "email": email,
                 "is_company": False,
             })
@@ -473,9 +680,10 @@ class BeautyAppointment(models.Model):
             "start_datetime": start_utc_str,
             "duration": duration,
         })
+        # La reserva web queda "por confirmar": solo la técnica la confirma.
         try:
-            appointment.action_confirm()
+            appointment.action_request_confirmation()
         except (UserError, ValidationError):
             appointment.sudo().unlink()
-            raise ValidationError("Ese hueco acaba de ocuparse. Elige otro horario.")
+            raise ValidationError("No se pudo registrar tu reserva. Inténtalo de nuevo.")
         return appointment

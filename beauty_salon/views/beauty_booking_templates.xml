@@ -37,7 +37,10 @@
                                 <div class="card-body">
                                     <div class="d-flex justify-content-between align-items-center mb-3">
                                         <h5 class="card-title mb-0">1 · Elige servicio</h5>
-                                        <a id="booking_catalog_link" href="/reservar/catalogo" class="btn btn-primary beauty-catalog-btn">Ver catálogo</a>
+                                        <div class="d-flex gap-2">
+                                            <a href="/reservar/mis-reservas" class="btn btn-primary beauty-catalog-btn">Mis reservas</a>
+                                            <a id="booking_catalog_link" href="/reservar/catalogo" class="btn btn-primary beauty-catalog-btn">Ver catálogo</a>
+                                        </div>
                                     </div>
                                     <t t-foreach="services" t-as="s">
                                         <div class="form-check">
@@ -46,7 +49,7 @@
                                                 t-att-checked="'checked' if s.id in service_ids else None"/>
                                             <label class="form-check-label" t-att-for="'service_%s' % s.id">
                                                 <strong><t t-esc="s.name"/></strong>
-                                                <span class="text-muted"> · <t t-esc="s.list_price"/> € · <t t-esc="s.duration"/> h</span>
+                                                <span class="text-muted"> · <t t-esc="s.currency_id.symbol"/><t t-esc="s.list_price"/> · <t t-esc="s.duration"/> h</span>
                                             </label>
                                         </div>
                                     </t>
@@ -102,7 +105,7 @@
                                         </t>
                                     </div>
                                     <p id="booking_no_slots" class="text-muted mb-0" t-att-style="'display:none;' if slots else ''">Elige un día para ver las horas.</p>
-                                    <small class="text-muted d-block mt-2" t-if="slots">Hora local del salón (Europe/Madrid).</small>
+                                    <small class="text-muted d-block mt-2" t-if="slots">Hora local de Cuba.</small>
                                 </div>
                             </div>
 
@@ -150,8 +153,8 @@
             <div class="beauty-hero beauty-hero-ok">
                 <div class="container">
                     <div class="beauty-ok-check">✓</div>
-                    <h1 class="beauty-hero-title">¡Reserva confirmada!</h1>
-                    <p class="beauty-hero-sub">Te esperamos, <t t-esc="appointment.partner_id.name"/>.</p>
+                    <h1 class="beauty-hero-title">¡Reserva recibida!</h1>
+                    <p class="beauty-hero-sub">Te avisaremos cuando la técnica confirme tu cita, <t t-esc="appointment.partner_id.name"/>.</p>
                 </div>
             </div>
             <div class="container pb-5" id="beauty_booking_ok">
@@ -162,12 +165,15 @@
                                 <div class="beauty-ok-row"><span class="beauty-ok-label">Referencia</span><strong><t t-esc="appointment.name"/></strong></div>
                                 <div class="beauty-ok-row"><span class="beauty-ok-label">Servicios</span><strong><t t-foreach="services" t-as="s"><t t-esc="s.name"/><span t-if="not s_last">, </span></t></strong></div>
                                 <div class="beauty-ok-row"><span class="beauty-ok-label">Técnica</span><strong><t t-esc="appointment.technician_id.name"/></strong></div>
-                                <div class="beauty-ok-row"><span class="beauty-ok-label">Inicio</span><strong><span t-field="appointment.start_datetime" t-options="{'widget': 'datetime'}"/></strong></div>
+                                <div class="beauty-ok-row"><span class="beauty-ok-label">Inicio</span><strong><t t-esc="appointment.booking_local_display"/></strong></div>
                             </div>
                         </div>
                         <div class="text-center mt-4">
                             <img src="/beauty_salon/static/src/img/logo-256.png" alt="Ailid Manso" width="48" height="48" class="beauty-ok-logo"/>
-                            <div><a href="/reservar" class="btn btn-primary btn-lg">Hacer otra reserva</a></div>
+                            <div class="d-flex flex-column gap-2 align-items-center">
+                                <a href="/reservar" class="btn btn-primary btn-lg">Hacer otra reserva</a>
+                                <a t-if="whatsapp_url" t-att-href="whatsapp_url" target="_blank" rel="noopener" class="btn btn-lg beauty-whatsapp-btn">Confirmar por WhatsApp</a>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -203,7 +209,7 @@
                                 <img t-att-src="'/reservar/servicio/%s/imagen' % s.id" t-att-alt="s.name" class="beauty-catalog-img" loading="lazy"/>
                                 <div class="card-body">
                                     <h5 class="card-title"><t t-esc="s.name"/></h5>
-                                    <div class="beauty-catalog-meta"><t t-esc="s.list_price"/> € · <t t-esc="s.duration"/> h</div>
+                                    <div class="beauty-catalog-meta"><t t-esc="s.list_price"/> <t t-esc="s.currency_id.symbol"/> · <t t-esc="s.duration"/> h</div>
                                     <p class="beauty-catalog-desc"><t t-esc="s.description or 'Consulta en el salón los detalles de este servicio.'"/></p>
                                 </div>
                             </div>
@@ -212,6 +218,71 @@
                 </div>
                 <div class="text-center mt-4">
                     <a t-att-href="back_url" class="btn btn-primary btn-lg">← Volver a reservar</a>
+                </div>
+            </div>
+        </t>
+    </template>
+
+    <template id="beauty_booking_mine" name="Mis reservas">
+        <t t-call="website.layout">
+            <t t-set="no_header" t-value="True"/>
+            <t t-set="no_footer" t-value="True"/>
+            <t t-set="head">
+                <link rel="icon" type="image/x-icon" href="/beauty_salon/static/src/img/favicon.ico"/>
+                <link rel="icon" type="image/png" sizes="32x32" href="/beauty_salon/static/src/img/favicon-32.png"/>
+                <link rel="apple-touch-icon" href="/beauty_salon/static/src/img/logo-256.png"/>
+                <link rel="preconnect" href="https://fonts.googleapis.com"/>
+                <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous"/>
+                <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&amp;family=Jost:wght@300;400;500;600&amp;display=swap"/>
+            </t>
+            <div class="beauty-hero beauty-hero-ok">
+                <div class="container">
+                    <img src="/beauty_salon/static/src/img/logo-256.png" alt="Ailid Manso" width="72" height="72" class="beauty-hero-logo"/>
+                    <div class="beauty-hero-brand">Ailid Manso · Salón de belleza</div>
+                    <h1 class="beauty-hero-title">Mis reservas</h1>
+                    <p class="beauty-hero-sub">Consulta tus citas con tu teléfono</p>
+                </div>
+            </div>
+            <div class="container pb-5" id="beauty_mine">
+                <div class="row justify-content-center">
+                    <div class="col-lg-8">
+                        <div class="card mb-3">
+                            <div class="card-body">
+                                <form action="/reservar/mis-reservas" method="get" class="d-flex gap-2">
+                                    <input type="tel" class="form-control" name="phone" required="1"
+                                        t-att-value="phone" placeholder="Tu teléfono"/>
+                                    <button type="submit" class="btn btn-primary beauty-search-btn">Buscar</button>
+                                </form>
+                                <t t-if="error">
+                                    <div class="alert alert-warning mt-3 mb-0" role="alert"><t t-esc="error"/></div>
+                                </t>
+                            </div>
+                        </div>
+                        <t t-if="appointments">
+                            <div class="card">
+                                <div class="card-body p-0">
+                                    <t t-foreach="appointments" t-as="a">
+                                        <div t-attf-class="beauty-mine-row d-flex justify-content-between align-items-start gap-3 {{'beauty-mine-past' if a.state in ('done', 'cancelled') else ''}}">
+                                            <div>
+                                                <strong><t t-esc="a.name"/></strong>
+                                                <div class="text-muted">
+                                                    <t t-esc="a.service_names_display"/> ·
+                                                    <t t-esc="a.technician_id.name"/>
+                                                </div>
+                                                <div><t t-esc="a.booking_local_display"/></div>
+                                            </div>
+                                            <span t-attf-class="badge beauty-state-{{a.state}}">
+                                                <t t-esc="dict(a._fields['state'].selection).get(a.state)"/>
+                                            </span>
+                                        </div>
+                                    </t>
+                                </div>
+                            </div>
+                        </t>
+                        <div class="text-center mt-4">
+                            <a href="/reservar" class="btn btn-primary btn-lg">← Volver a reservar</a>
+                        </div>
+                    </div>
                 </div>
             </div>
         </t>

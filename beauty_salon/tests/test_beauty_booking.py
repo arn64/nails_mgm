@@ -1,4 +1,6 @@
-from datetime import timedelta
+from datetime import datetime, timedelta
+
+import pytz
 
 from odoo.exceptions import ValidationError
 from odoo.tests.common import TransactionCase
@@ -55,6 +57,8 @@ class TestBeautyBooking(TransactionCase):
             start_utc_str=first["start_utc"],
             technician_id=first["technician_id"],
         )
+        self.assertEqual(appt.state, "to_confirm")
+        appt.action_confirm()
         self.assertEqual(appt.state, "confirmed")
         remaining = self.Appointment.get_booking_day_slots(
             day, self.service.ids, technician_id=first["technician_id"]
@@ -125,7 +129,7 @@ class TestBeautyBooking(TransactionCase):
             start_utc_str=slots[0]["start_utc"],
             technician_id=self.technician.id,
         )
-        self.assertEqual(appt.state, "confirmed")
+        self.assertEqual(appt.state, "to_confirm")
         self.assertIn("Servicio web", appt.service_names_display)
         mail = self.env["mail.mail"].search([
             ("model", "=", "beauty.appointment"),
@@ -133,6 +137,31 @@ class TestBeautyBooking(TransactionCase):
         ], limit=1)
         self.assertTrue(mail, "Debe encolarse el aviso a la técnica")
         self.assertIn("tecnica@test.local", mail.email_to)
+
+    def test_confirm_posts_note_and_schedules_activity(self):
+        day, slots = self._next_workday()
+        appt = self.Appointment.create_public_booking(
+            name="Ana", phone="600111222", email="",
+            service_ids=self.service.ids,
+            start_utc_str=slots[0]["start_utc"],
+            technician_id=self.technician.id,
+        )
+        self.assertEqual(appt.state, "to_confirm")
+        # Solo la técnica confirma: ahí se publica el aviso y la actividad.
+        appt.action_confirm()
+        self.assertEqual(appt.state, "confirmed")
+        message = self.env["mail.message"].search([
+            ("model", "=", "beauty.appointment"),
+            ("res_id", "=", appt.id),
+            ("body", "ilike", "Cita confirmada"),
+        ], limit=1)
+        self.assertTrue(message, "Debe publicarse el aviso en el chatter")
+        activity = self.env["mail.activity"].search([
+            ("res_model", "=", "beauty.appointment"),
+            ("res_id", "=", appt.id),
+        ], limit=1)
+        self.assertTrue(activity, "Debe crearse la actividad de la cita")
+        self.assertIn(appt.name, activity.summary)
 
     def test_slots_follow_service_schedule(self):
         morning_service = self.env["beauty.service"].create({
@@ -162,3 +191,158 @@ class TestBeautyBooking(TransactionCase):
         self.assertTrue(afternoon_slots)
         for slot in afternoon_slots:
             self.assertTrue(slot["label"].endswith("pm"), slot["label"])
+
+    def test_slots_use_technician_timezone(self):
+        self.technician.tz = "America/New_York"
+        tz = pytz.timezone("America/New_York")
+        day = datetime.now(tz).date() + timedelta(days=3)
+        while day.weekday() >= 5:
+            day += timedelta(days=1)
+        slots = self.Appointment.get_booking_day_slots(
+            day, self.service.ids, technician_id=self.technician.id
+        )
+        self.assertTrue(slots)
+        # Ventanas 10:00-11:30 y 13:30-17:00 en hora de Nueva York (servicio 1h).
+        allowed = {
+            (10, 0), (10, 30),
+            (13, 30), (14, 0), (14, 30), (15, 0), (15, 30), (16, 0),
+        }
+        for slot in slots:
+            utc = datetime.strptime(
+                slot["start_utc"], "%Y-%m-%d %H:%M:%S"
+            ).replace(tzinfo=pytz.utc)
+            local = utc.astimezone(tz)
+            self.assertIn((local.hour, local.minute), allowed, slot)
+        appt = self.Appointment.create_public_booking(
+            name="Ana", phone="600111222", email="",
+            service_ids=self.service.ids,
+            start_utc_str=slots[0]["start_utc"],
+            technician_id=self.technician.id,
+        )
+        self.assertEqual(appt.state, "to_confirm")
+        self.assertIn("America/New_York", appt.booking_local_display)
+
+    def test_cron_marks_past_confirmed_as_done(self):
+        past = self.env["beauty.appointment"].create({
+            "partner_id": self.env["res.partner"].create({"name": "Ayer"}).id,
+            "technician_id": self.technician.id,
+            "service_ids": [(6, 0, self.service.ids)],
+            "start_datetime": "2020-01-06 14:00:00",
+            "duration": 1.0,
+        })
+        past.action_confirm()
+        future = self.env["beauty.appointment"].create({
+            "partner_id": past.partner_id.id,
+            "technician_id": self.technician.id,
+            "service_ids": [(6, 0, self.service.ids)],
+            "start_datetime": "2030-06-01 14:00:00",
+            "duration": 1.0,
+        })
+        future.action_confirm()
+        done = self.Appointment.cron_mark_past_done()
+        self.assertIn(past, done)
+        self.assertEqual(past.state, "done")
+        self.assertEqual(future.state, "confirmed")
+
+    def test_request_then_confirm_flow_and_whatsapp(self):
+        day, slots = self._next_workday()
+        appt = self.Appointment.create_public_booking(
+            name="Ana", phone="600111222", email="",
+            service_ids=self.service.ids,
+            start_utc_str=slots[0]["start_utc"],
+            technician_id=self.technician.id,
+        )
+        self.assertEqual(appt.state, "to_confirm")
+        # La técnica confirma y puede escribir por WhatsApp a la clienta.
+        appt.action_confirm()
+        self.assertEqual(appt.state, "confirmed")
+        action = appt.action_open_whatsapp()
+        self.assertEqual(action["type"], "ir.actions.act_url")
+        self.assertIn("https://wa.me/600111222?text=", action["url"])
+
+    def test_request_notifies_and_confirm_sends_whatsapp(self):
+        from unittest.mock import patch
+
+        day, slots = self._next_workday()
+        appt = self.Appointment.create_public_booking(
+            name="Ana", phone="51234567", email="",
+            service_ids=self.service.ids,
+            start_utc_str=slots[0]["start_utc"],
+            technician_id=self.technician.id,
+        )
+        # Al crear (por confirmar): nota interna, sin actividad aún.
+        note = self.env["mail.message"].search([
+            ("model", "=", "beauty.appointment"),
+            ("res_id", "=", appt.id),
+            ("body", "ilike", "Nueva solicitud de reserva"),
+        ], limit=1)
+        self.assertTrue(note, "Debe avisar en el chatter al crear la cita")
+        self.assertFalse(
+            self.env["mail.activity"].search([
+                ("res_model", "=", "beauty.appointment"),
+                ("res_id", "=", appt.id),
+            ]),
+            "Aún no debe haber actividad antes de confirmar",
+        )
+        # Sin configurar Meta: confirmar no falla ni envía nada.
+        appt.action_confirm()
+        activity = self.env["mail.activity"].search([
+            ("res_model", "=", "beauty.appointment"),
+            ("res_id", "=", appt.id),
+        ], limit=1)
+        self.assertTrue(activity, "Debe crear la actividad al confirmar")
+        # Configurado: llama a la API de Meta con el móvil cubano completo.
+        params = self.env["ir.config_parameter"].sudo()
+        params.set_param("beauty_salon.whatsapp_token", "TESTTOKEN")
+        params.set_param("beauty_salon.whatsapp_phone_id", "12345")
+        try:
+            with patch("odoo.addons.beauty_salon.models.beauty_appointment.requests.post") as post:
+                post.return_value.status_code = 200
+                post.return_value.text = "{}"
+                appt._send_whatsapp_confirmation()
+            self.assertTrue(post.called)
+            url = post.call_args[0][0]
+            payload = post.call_args[1]["json"]
+            self.assertIn("/12345/messages", url)
+            self.assertEqual(payload["to"], "5351234567")
+            self.assertIn(appt.name, payload["text"]["body"])
+        finally:
+            params.set_param("beauty_salon.whatsapp_token", "")
+            params.set_param("beauty_salon.whatsapp_phone_id", "")
+
+    def test_same_phone_other_name_creates_new_partner(self):
+        day, slots = self._next_workday()
+        first = self.Appointment.create_public_booking(
+            name="Ana Pérez", phone="600111222", email="",
+            service_ids=self.service.ids,
+            start_utc_str=slots[0]["start_utc"],
+            technician_id=self.technician.id,
+        )
+        second = self.Appointment.create_public_booking(
+            name="María Gómez", phone="600111222", email="",
+            service_ids=self.service.ids,
+            start_utc_str=slots[1]["start_utc"],
+            technician_id=self.technician.id,
+        )
+        self.assertNotEqual(first.partner_id, second.partner_id)
+        self.assertEqual(first.partner_id.name, "Ana Pérez")
+        self.assertEqual(second.partner_id.name, "María Gómez")
+
+    def test_appointments_ordered_by_creation_desc(self):
+        day, slots = self._next_workday()
+        first = self.Appointment.create_public_booking(
+            name="Ana", phone="600111222", email="",
+            service_ids=self.service.ids,
+            start_utc_str=slots[0]["start_utc"],
+            technician_id=self.technician.id,
+        )
+        second = self.Appointment.create_public_booking(
+            name="Ana", phone="600111333", email="",
+            service_ids=self.service.ids,
+            start_utc_str=slots[1]["start_utc"],
+            technician_id=self.technician.id,
+        )
+        found = self.Appointment.search([
+            ("id", "in", (first + second).ids),
+        ])
+        self.assertEqual([a.id for a in found], [second.id, first.id])
