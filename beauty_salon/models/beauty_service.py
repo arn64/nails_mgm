@@ -19,7 +19,7 @@ class BeautyService(models.Model):
     schedule = fields.Selection(
         [
             ("morning", "Mañana (10:00–11:30 am)"),
-            ("afternoon", "Tarde (1:30–5:00 pm)"),
+            ("afternoon", "Tarde (1:00–5:00 pm)"),
             ("both", "Mañana y tarde"),
         ],
         string="Turno",

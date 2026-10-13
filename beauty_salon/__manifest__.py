@@ -2,7 +2,7 @@
 
 {
     "name": "Salón de Belleza (Uñas y Cejas)",
-    "version": "19.0.1.1.0",
+    "version": "19.0.1.3.0",
     "summary": "Gestión de arreglos de uñas y cejas: servicios, citas, clientas y técnicas",
     "description": """
 Salón de Belleza - Uñas y Cejas
@@ -45,6 +45,9 @@ Gestión sencilla para salones de uñas y cejas:
         ],
         "web.assets_frontend": [
             "beauty_salon/static/src/scss/beauty_frontend.scss",
+        ],
+        "web.assets_backend": [
+            "beauty_salon/static/src/js/beauty_datetime_patch.js",
         ],
     },
 }

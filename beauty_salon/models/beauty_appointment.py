@@ -20,6 +20,7 @@ class BeautyAppointment(models.Model):
     _inherit = ["mail.thread", "mail.activity.mixin"]
 
     name = fields.Char(
+        string="Referencia",
         default="Nuevo", required=True, copy=False, readonly=True, tracking=True
     )
     partner_id = fields.Many2one(
@@ -158,6 +159,24 @@ class BeautyAppointment(models.Model):
     @api.onchange("service_ids")
     def _onchange_service_ids(self):
         self.duration = sum(self.service_ids.mapped("duration")) or 1.0
+
+    @api.constrains("start_datetime", "technician_id", "state")
+    def _check_booking_hours(self):
+        """El inicio debe caer en horario del salón (también manual).
+
+        Evita citas de madrugada por error. Solo se exige el inicio en
+        ventana (el fin puede extenderse a criterio del personal).
+        """
+        for appt in self:
+            if appt.state == "cancelled" or not appt.start_datetime:
+                continue
+            tz = appt._booking_tz_for_technician(appt.technician_id)
+            local = pytz.utc.localize(appt.start_datetime).astimezone(tz)
+            start_min = local.hour * 60 + local.minute
+            if not any(w0 <= start_min <= w1 for w0, w1 in self.BOOKING_WINDOWS):
+                raise ValidationError(
+                    f"El inicio debe estar en el horario del salón ({self.BOOKING_HOURS_LABEL})."
+                )
 
     @api.constrains(
         "service_ids", "start_datetime", "duration", "end_datetime", "technician_id", "state"
@@ -452,10 +471,10 @@ class BeautyAppointment(models.Model):
 
     # --- Reserva web pública ---
     # Horario del salón (hora local). Ventanas en minutos desde medianoche.
-    # Ej.: (10:00-11:30) y (13:30-17:00). Ajusta aquí si cambia el horario.
+    # Mañana 10:00-11:30 am y tarde 1:00-5:00 pm. Ajusta aquí si cambia.
     BOOKING_TZ = "America/Havana"
-    BOOKING_WINDOWS = [(10 * 60, 11 * 60 + 30), (13 * 60 + 30, 17 * 60)]
-    BOOKING_HOURS_LABEL = "10:00–11:30 am y 1:30–5:00 pm"
+    BOOKING_WINDOWS = [(10 * 60, 11 * 60 + 30), (13 * 60, 17 * 60)]
+    BOOKING_HOURS_LABEL = "10:00–11:30 am y 1:00–5:00 pm"
     # Ventana 0 = mañana, ventana 1 = tarde (índices de BOOKING_WINDOWS).
     BOOKING_SCHEDULE_WINDOWS = {"morning": (0,), "afternoon": (1,), "both": (0, 1)}
     BOOKING_SLOT_MINUTES = 30

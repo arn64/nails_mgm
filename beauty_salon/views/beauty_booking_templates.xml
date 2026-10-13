@@ -17,7 +17,7 @@
                     <img src="/beauty_salon/static/src/img/logo-256.png" alt="Ailid Manso" width="88" height="88" class="beauty-hero-logo"/>
                     <div class="beauty-hero-brand">Ailid Manso · Salón de belleza</div>
                     <h1 class="beauty-hero-title">Reserva tu momento</h1>
-                    <p class="beauty-hero-sub">Lunes a viernes · 10:00–11:30 am y 1:30–5:00 pm</p>
+                    <p class="beauty-hero-sub">Lunes a viernes · 10:00–11:30 am y 1:00–5:00 pm</p>
                 </div>
             </div>
             <div class="container pb-5" id="beauty_booking">

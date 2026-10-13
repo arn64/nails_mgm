@@ -26,20 +26,20 @@ class TestBeautySalon(TransactionCase):
         return self.env["beauty.appointment"].create(values)
 
     def test_schedule_blocks_overlap_and_allows_adjacent_booking(self):
-        first = self._appointment("2030-05-01 10:00:00")
+        first = self._appointment("2030-05-01 14:00:00")
         first.action_confirm()
-        second = self._appointment("2030-05-01 10:30:00")
+        second = self._appointment("2030-05-01 14:30:00")
         with self.assertRaises(ValidationError), self.cr.savepoint():
             second.action_confirm()
-        adjacent = self._appointment("2030-05-01 11:00:00")
+        adjacent = self._appointment("2030-05-01 15:00:00")
         adjacent.action_confirm()
         first.action_cancel()
         second.action_confirm()
         with self.assertRaises(ValidationError), self.cr.savepoint():
-            adjacent.write({"start_datetime": "2030-05-01 10:45:00"})
+            adjacent.write({"start_datetime": "2030-05-01 14:45:00"})
 
     def test_amount_and_last_visit_follow_realized_service(self):
-        appointment = self._appointment("2030-05-01 10:00:00")
+        appointment = self._appointment("2030-05-01 14:00:00")
         self.assertEqual(appointment.amount_total, 25.0)
         self.assertFalse(self.partner.beauty_last_visit)
         self.service.list_price = 30.0
@@ -52,7 +52,7 @@ class TestBeautySalon(TransactionCase):
         self.assertEqual(self.technician.commission_amount, 3.0)
 
     def test_sale_order_has_service_product_and_is_reused(self):
-        appointment = self._appointment("2030-05-01 10:00:00")
+        appointment = self._appointment("2030-05-01 14:00:00")
         with self.assertRaises(UserError):
             appointment.action_create_sale_order()
         appointment.action_confirm()
@@ -74,4 +74,4 @@ class TestBeautySalon(TransactionCase):
         with self.assertRaises(ValidationError), self.cr.savepoint():
             self.technician.commission_rate = 101
         with self.assertRaises(ValidationError), self.cr.savepoint():
-            self._appointment("2030-05-01 10:00:00", duration=0)
+            self._appointment("2030-05-01 14:00:00", duration=0)

@@ -6,6 +6,14 @@ from odoo.exceptions import ValidationError
 from odoo.tests.common import TransactionCase
 
 
+def havana_utc(year, month, day, hour, minute=0):
+    """UTC naive desde hora local de La Habana (respeta DST)."""
+    tz = pytz.timezone("America/Havana")
+    return tz.localize(datetime(year, month, day, hour, minute)).astimezone(
+        pytz.utc
+    ).replace(tzinfo=None).strftime("%Y-%m-%d %H:%M:%S")
+
+
 class TestBeautyBooking(TransactionCase):
     def setUp(self):
         super().setUp()
@@ -39,7 +47,7 @@ class TestBeautyBooking(TransactionCase):
         # Etiquetas en hora normal con am/pm y dentro de las ventanas.
         in_morning = lambda label: label in ("10:00 am", "10:30 am")  # servicio de 1h
         in_afternoon = lambda label: label in (
-            "1:30 pm", "2:00 pm", "2:30 pm", "3:00 pm", "3:30 pm", "4:00 pm",
+            "1:00 pm", "1:30 pm", "2:00 pm", "2:30 pm", "3:00 pm", "3:30 pm", "4:00 pm",
         )
         for slot in slots:
             self.assertTrue(
@@ -202,10 +210,10 @@ class TestBeautyBooking(TransactionCase):
             day, self.service.ids, technician_id=self.technician.id
         )
         self.assertTrue(slots)
-        # Ventanas 10:00-11:30 y 13:30-17:00 en hora de Nueva York (servicio 1h).
+        # Ventanas 10:00-11:30 am y 1:00-5:00 pm en hora de Nueva York (servicio 1h).
         allowed = {
             (10, 0), (10, 30),
-            (13, 30), (14, 0), (14, 30), (15, 0), (15, 30), (16, 0),
+            (13, 0), (13, 30), (14, 0), (14, 30), (15, 0), (15, 30), (16, 0),
         }
         for slot in slots:
             utc = datetime.strptime(
@@ -233,7 +241,7 @@ class TestBeautyBooking(TransactionCase):
             "partner_id": self.env["res.partner"].create({"name": "Ayer"}).id,
             "technician_id": self.technician.id,
             "service_ids": [(6, 0, self.service.ids)],
-            "start_datetime": "2020-01-06 14:00:00",
+            "start_datetime": havana_utc(2020, 1, 6, 10),
             "duration": 1.0,
         })
         past.action_confirm()
@@ -241,7 +249,7 @@ class TestBeautyBooking(TransactionCase):
             "partner_id": past.partner_id.id,
             "technician_id": self.technician.id,
             "service_ids": [(6, 0, self.service.ids)],
-            "start_datetime": "2030-06-01 14:00:00",
+            "start_datetime": havana_utc(2030, 6, 1, 10),
             "duration": 1.0,
         })
         future.action_confirm()
@@ -412,3 +420,24 @@ class TestBeautyBooking(TransactionCase):
             or user.partner_id in mail.recipient_ids
         )
         self.assertTrue(addressed, "Debe ir dirigido al usuario vinculado")
+
+    def test_manual_booking_outside_hours_is_rejected(self):
+        partner = self.env["res.partner"].create({"name": "Manual"})
+        # 3:00 am La Habana: ni manual se permite.
+        with self.assertRaises(ValidationError):
+            self.env["beauty.appointment"].create({
+                "partner_id": partner.id,
+                "technician_id": self.technician.id,
+                "service_ids": [(6, 0, self.service.ids)],
+                "start_datetime": havana_utc(2030, 6, 2, 3),
+                "duration": 1.0,
+            })
+        # 10:00 am La Habana: válido.
+        ok = self.env["beauty.appointment"].create({
+            "partner_id": partner.id,
+            "technician_id": self.technician.id,
+            "service_ids": [(6, 0, self.service.ids)],
+            "start_datetime": havana_utc(2030, 6, 2, 10),
+            "duration": 1.0,
+        })
+        self.assertTrue(ok)
