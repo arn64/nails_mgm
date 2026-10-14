@@ -20,7 +20,9 @@
             const btn = document.createElement("button");
             btn.type = "button";
             btn.dataset.date = d.date;
-            btn.className = "btn btn-day " + (d.date === currentDay ? "btn-primary" : "btn-outline-primary");
+            btn.className = "btn btn-day " + (d.date === currentDay ? "btn-primary" : "btn-outline-primary") + (d.is_weekend ? " btn-day-weekend" : "");
+            if (d.is_weekend) btn.title = "Requiere confirmación de la técnica";
+            btn.setAttribute("aria-label", d.weekday + " " + d.label + (d.is_weekend ? " · requiere confirmación de la técnica" : ""));
             btn.innerHTML = d.weekday + "<br/><strong>" + d.label + "</strong>";
             btn.addEventListener("click", () => chooseDay(d.date));
             box.appendChild(btn);

@@ -557,8 +557,6 @@ class BeautyAppointment(models.Model):
         """
         if isinstance(day_date, str):
             day_date = datetime.strptime(day_date, "%Y-%m-%d").date()
-        if day_date.weekday() >= 5:  # Lun-Vie
-            return []
         services = self.env["beauty.service"].browse(service_ids).exists()
         if not services:
             return []
@@ -604,9 +602,7 @@ class BeautyAppointment(models.Model):
 
     @api.model
     def get_booking_available_days(self, service_ids, technician_id=None, days_ahead=None):
-        """Próximos días laborables con al menos un hueco libre."""
-        from datetime import date as date_cls
-
+        """Próximos días con al menos un hueco libre, incluidos fines de semana."""
         days_ahead = days_ahead or self.BOOKING_DAYS_AHEAD
         today = datetime.now(self._booking_tz()).date()
         result = []
@@ -614,14 +610,13 @@ class BeautyAppointment(models.Model):
         while len(result) < days_ahead and offset < days_ahead + 14:
             day = today + timedelta(days=offset)
             offset += 1
-            if day.weekday() >= 5:
-                continue
             slots = self.get_booking_day_slots(day, service_ids, technician_id)
             if slots:
                 result.append({
                     "date": day.isoformat(),
                     "label": day.strftime("%d/%m"),
                     "weekday": ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"][day.weekday()],
+                    "is_weekend": day.weekday() >= 5,
                     "slots_count": len(slots),
                 })
         return result
@@ -629,7 +624,7 @@ class BeautyAppointment(models.Model):
     @api.model
     def create_public_booking(self, name, phone, email, service_ids,
                               start_utc_str, technician_id=None):
-        """Crea y confirma una cita desde la web pública. Devuelve la cita."""
+        """Crea una solicitud de cita desde la web pública. Devuelve la cita."""
         name = (name or "").strip()
         phone = (phone or "").strip()
         email = (email or "").strip() or False
@@ -672,11 +667,9 @@ class BeautyAppointment(models.Model):
         if not chosen:
             raise ValidationError("Ese hueco acaba de ocuparse. Elige otro horario.")
 
-        # Ventanas y día laborable en la zona horaria de la técnica asignada.
+        # Ventanas en la zona horaria de la técnica asignada.
         tz = self._booking_tz_for_technician(chosen)
         local_start = pytz.utc.localize(start_utc).astimezone(tz)
-        if local_start.weekday() >= 5:
-            raise ValidationError("Solo reservamos de lunes a viernes.")
         start_minutes = local_start.hour * 60 + local_start.minute
         if not self._booking_slot_in_hours(start_minutes, duration, services):
             raise ValidationError(

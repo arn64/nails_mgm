@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 
 import pytz
 
@@ -94,23 +94,35 @@ class TestBeautyBooking(TransactionCase):
                 start_utc_str=slots[0]["start_utc"],
             )
 
-    def test_weekend_has_no_slots(self):
-        from datetime import date as date_cls
-        # Busca el próximo sábado.
-        today = self.Appointment._booking_tz().localize(
-            __import__("datetime").datetime.now()
-        ).date()
-        offset = 0
-        saturday = None
-        for i in range(1, 10):
-            candidate = today + timedelta(days=i)
-            if candidate.weekday() == 5:
-                saturday = candidate
-                break
-        self.assertTrue(saturday)
-        self.assertEqual(
-            self.Appointment.get_booking_day_slots(saturday, self.service.ids), []
+    def test_weekend_slots_are_available_and_require_confirmation(self):
+        today = datetime.now(self.Appointment._booking_tz()).date()
+        days = self.Appointment.get_booking_available_days(
+            self.service.ids, technician_id=self.technician.id
         )
+        self.assertTrue(days)
+        for entry in days:
+            self.assertEqual(
+                entry["is_weekend"], date.fromisoformat(entry["date"]).weekday() >= 5
+            )
+        for weekday in (5, 6):
+            weekend = next(
+                today + timedelta(days=i)
+                for i in range(1, 8)
+                if (today + timedelta(days=i)).weekday() == weekday
+            )
+            entry = next(d for d in days if d["date"] == weekend.isoformat())
+            self.assertTrue(entry["is_weekend"])
+            slots = self.Appointment.get_booking_day_slots(
+                weekend, self.service.ids, technician_id=self.technician.id
+            )
+            self.assertTrue(slots)
+            appointment = self.Appointment.create_public_booking(
+                name="Ana", phone="600111222", email="",
+                service_ids=self.service.ids,
+                start_utc_str=slots[0]["start_utc"],
+                technician_id=self.technician.id,
+            )
+            self.assertEqual(appointment.state, "to_confirm")
 
     def test_booking_outside_windows_is_rejected(self):
         day, slots = self._next_workday()

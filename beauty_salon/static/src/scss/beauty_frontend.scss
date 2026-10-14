@@ -139,6 +139,31 @@ $beauty-ink: #23414f;
         border-color: $beauty-sky-dark;
         box-shadow: 0 6px 16px rgba(46, 127, 168, 0.35);
     }
+    .btn-day.btn-day-weekend.btn-outline-primary {
+        background: #fff5cc;
+        border-color: #d6a426;
+        color: $beauty-ink;
+        &:hover {
+            background: #ffe89a;
+            border-color: #b98912;
+            color: $beauty-ink;
+        }
+    }
+    .btn-day.btn-day-weekend.btn-primary {
+        background: linear-gradient(135deg, #ffe681, #f2c64d);
+        border-color: #b98912;
+        color: $beauty-ink;
+        box-shadow: 0 6px 16px rgba(185, 137, 18, 0.25);
+    }
+    .beauty-weekend-note {
+        display: inline-block;
+        padding: 0.55rem 0.85rem;
+        border-radius: 0.75rem;
+        background: #fff5cc;
+        border-left: 3px solid #d6a426;
+        color: $beauty-ink;
+        font-size: 0.92rem;
+    }
 
     button[type="submit"].btn-primary {
         background: linear-gradient(135deg, $beauty-sky, $beauty-sky-dark);

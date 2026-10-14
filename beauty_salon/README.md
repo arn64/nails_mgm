@@ -12,6 +12,8 @@ El módulo gestiona servicios de uñas y cejas, clientas, técnicas y citas desd
 
 La cifra de la cita es el subtotal de los precios actuales del catálogo. Los impuestos y descuentos se gestionan en el pedido de venta.
 
+La reserva web está disponible todos los días de 10:00 a 11:30 am y de 1:00 a 5:00 pm. Los sábados y domingos aparecen en amarillo y las solicitudes quedan pendientes de confirmación de la técnica.
+
 ## Verificación
 
 Con PostgreSQL disponible, desde la carpeta raíz del proyecto:

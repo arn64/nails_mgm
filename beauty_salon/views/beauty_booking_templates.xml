@@ -17,7 +17,7 @@
                     <img src="/beauty_salon/static/src/img/logo-256.png" alt="Ailid Manso" width="88" height="88" class="beauty-hero-logo"/>
                     <div class="beauty-hero-brand">Ailid Manso · Salón de belleza</div>
                     <h1 class="beauty-hero-title">Reserva tu momento</h1>
-                    <p class="beauty-hero-sub">Lunes a viernes · 10:00–11:30 am y 1:00–5:00 pm</p>
+                    <p class="beauty-hero-sub">Todos los días · 10:00–11:30 am y 1:00–5:00 pm</p>
                 </div>
             </div>
             <div class="container pb-5" id="beauty_booking">
@@ -81,8 +81,10 @@
                                         <t t-foreach="days" t-as="d">
                                             <button type="button"
                                                 class="btn btn-day"
-                                                t-att-class="'btn btn-day ' + ('btn-primary' if d['date'] == day else 'btn-outline-primary')"
-                                                t-att-data-date="d['date']">
+                                                t-att-class="'btn btn-day ' + ('btn-primary' if d['date'] == day else 'btn-outline-primary') + (' btn-day-weekend' if d['is_weekend'] else '')"
+                                                t-att-data-date="d['date']"
+                                                t-att-title="'Requiere confirmación de la técnica' if d['is_weekend'] else None"
+                                                t-att-aria-label="d['weekday'] + ' ' + d['label'] + (' · requiere confirmación de la técnica' if d['is_weekend'] else '')">
                                                 <t t-esc="d['weekday']"/><br/><strong><t t-esc="d['label']"/></strong>
                                             </button>
                                         </t>
@@ -127,7 +129,7 @@
                                         <input type="email" class="form-control" id="booking_email" name="email"
                                             t-att-value="booking_email" placeholder="tu@correo.com"/>
                                     </div>
-                                    <button type="submit" class="btn btn-primary btn-lg w-100">Confirmar reserva</button>
+                                    <button type="submit" class="btn btn-primary btn-lg w-100">Solicitar reserva</button>
                                 </div>
                             </div>
                         </form>
