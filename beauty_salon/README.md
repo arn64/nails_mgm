@@ -18,11 +18,11 @@ En una actualización, las citas que ya estaban por confirmar, confirmadas, real
 
 En **Salón de Belleza > Informes > Totales de citas** se muestran la cantidad de citas y la suma de sus importes, agrupadas por estado. Puede cambiar a gráfico, filtrar por fecha o estado y agrupar por técnica, día o mes. La lista de **Citas** también muestra al pie de la columna la suma de las citas visibles en la página; para el total de todas las citas filtradas, use el informe.
 
-El importe de las citas **realizadas** representa el valor de los servicios prestados. La tabla dinámica también permite comparar ese importe con el **cobrado neto** por estado.
+El importe de las citas **realizadas** representa el subtotal de los servicios acordados al confirmar. La tabla dinámica también permite compararlo con el **cobrado neto** por estado; si se cobran servicios adicionales durante el arreglo, el cobrado neto puede ser mayor.
 
 ## Cobros y devoluciones
 
-En una cita confirmada o realizada, pulse **Registrar cobro** e indique importe, fecha, método y referencia opcional. Puede registrar pagos parciales hasta completar el precio acordado. **Registrar devolución** anota un reembolso real y reduce el cobrado neto; no permite devolver más de lo recibido. Si un movimiento se registró por error, ábralo y pulse **Anular registro**: queda visible en la cita, deja de contar en los informes y conserva quién lo anuló y cuándo. Una cita cancelada muestra el saldo cobrado que no se ha devuelto, sin imponer una política de reembolso.
+En una cita confirmada o realizada, pulse **Registrar cobro** e indique importe, fecha, método y referencia opcional. Puede registrar pagos parciales o cobros adicionales cuando el precio final supere el subtotal de servicios acordado. El cobrado neto puede superar ese subtotal y el pendiente de cobro permanece en cero. **Registrar devolución** anota un reembolso real y reduce el cobrado neto; no permite devolver más de lo recibido. Si un movimiento se registró por error, ábralo y pulse **Anular registro**: queda visible en la cita, deja de contar en los informes y conserva quién lo anuló y cuándo. Una cita cancelada muestra el saldo cobrado que no se ha devuelto, sin imponer una política de reembolso.
 
 **Salón de Belleza > Informes > Cobros de citas** muestra el cobrado neto por fecha de pago y estado actual de la cita. Las devoluciones se restan. Estos registros son un control operativo del salón: no crean asientos contables ni concilian facturas de Odoo.
 

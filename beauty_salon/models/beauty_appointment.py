@@ -476,8 +476,6 @@ class BeautyAppointment(models.Model):
         self.ensure_one()
         if kind == "payment" and self.state not in ("confirmed", "done"):
             raise UserError("Confirma la cita antes de registrar un cobro.")
-        if kind == "payment" and self.amount_due <= 0:
-            raise UserError("El importe de esta cita ya está cobrado.")
         if kind == "refund" and self.amount_paid <= 0:
             raise UserError("Esta cita no tiene un cobro pendiente de devolver.")
         return {

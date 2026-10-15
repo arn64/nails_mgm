@@ -88,40 +88,43 @@ class TestBeautySalon(TransactionCase):
         self.assertEqual(first.signed_amount, 10.0)
         self.assertEqual(appointment.amount_paid, 10.0)
         self.assertEqual(appointment.amount_due, 15.0)
-        with self.assertRaises(ValidationError), self.cr.savepoint():
-            Payment.create({"appointment_id": appointment.id, "amount": 16.0})
+        Payment.create({"appointment_id": appointment.id, "amount": 16.0})
+        self.assertEqual(appointment.amount_total, 25.0)
+        self.assertEqual(appointment.amount_paid, 26.0)
+        self.assertEqual(appointment.amount_due, 0.0)
 
         appointment.action_cancel()
         self.assertEqual(appointment.amount_due, 0.0)
-        self.assertEqual(appointment.amount_not_refunded, 10.0)
+        self.assertEqual(appointment.amount_not_refunded, 26.0)
         with self.assertRaises(ValidationError), self.cr.savepoint():
             Payment.create({
-                "appointment_id": appointment.id, "kind": "refund", "amount": 11.0,
+                "appointment_id": appointment.id, "kind": "refund", "amount": 27.0,
             })
         refund = Payment.with_context(
             default_appointment_id=appointment.id, default_kind="refund"
         ).create({
-            "amount": 10.0,
+            "amount": 26.0,
             "payment_date": "2030-05-02", "method": "cash",
         })
-        self.assertEqual(refund.signed_amount, -10.0)
+        self.assertEqual(refund.signed_amount, -26.0)
         self.assertEqual(appointment.amount_paid, 0.0)
         self.assertEqual(appointment.amount_not_refunded, 0.0)
 
-    def test_payment_report_and_batch_limit(self):
+    def test_payment_report_and_batch_over_subtotal(self):
         appointment = self._appointment("2030-05-01 14:00:00")
         appointment.action_confirm()
         action = appointment.action_register_payment()
         self.assertEqual(action["context"]["default_amount"], 25.0)
         self.assertEqual(action["res_model"], "beauty.appointment.payment")
         self.assertTrue(self.env.ref("beauty_salon.view_beauty_appointment_payment_pivot"))
-        with self.assertRaises(ValidationError), self.cr.savepoint():
-            self.env["beauty.appointment.payment"].create([
-                {"appointment_id": appointment.id, "amount": 15.0},
-                {"appointment_id": appointment.id, "amount": 15.0},
-            ])
-        appointment.invalidate_recordset(["payment_ids"])
-        self.assertFalse(appointment.payment_ids)
+        self.env["beauty.appointment.payment"].create([
+            {"appointment_id": appointment.id, "amount": 15.0},
+            {"appointment_id": appointment.id, "amount": 15.0},
+        ])
+        self.assertEqual(appointment.amount_paid, 30.0)
+        self.assertEqual(appointment.amount_due, 0.0)
+        extra_action = appointment.action_register_payment()
+        self.assertEqual(extra_action["context"]["default_amount"], 0.0)
 
     def test_void_payment_keeps_audit_and_restores_balance(self):
         appointment = self._appointment("2030-05-01 14:00:00")
@@ -150,6 +153,19 @@ class TestBeautySalon(TransactionCase):
         with self.assertRaises(ValidationError), self.cr.savepoint():
             payment.action_void()
         self.assertEqual(payment.state, "posted")
+
+    def test_void_refund_can_restore_balance_above_subtotal(self):
+        appointment = self._appointment("2030-05-01 14:00:00")
+        appointment.action_confirm()
+        Payment = self.env["beauty.appointment.payment"]
+        Payment.create({"appointment_id": appointment.id, "amount": 35.0})
+        refund = Payment.create({
+            "appointment_id": appointment.id, "kind": "refund", "amount": 10.0,
+        })
+        self.assertEqual(appointment.amount_paid, 25.0)
+        refund.action_void()
+        self.assertEqual(appointment.amount_paid, 35.0)
+        self.assertEqual(appointment.amount_due, 0.0)
 
     def test_directly_created_confirmed_appointment_fixes_price(self):
         appointment = self._appointment("2030-05-01 14:00:00", state="confirmed")

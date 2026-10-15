@@ -109,13 +109,9 @@ class BeautyAppointmentPayment(models.Model):
             ])
             balance = sum(remaining.mapped("signed_amount"))
             rounding = appointment.currency_id.rounding
-            if (float_compare(balance, 0.0, precision_rounding=rounding) < 0 or
-                    float_compare(
-                        balance, appointment.amount_total,
-                        precision_rounding=rounding,
-                    ) > 0):
+            if float_compare(balance, 0.0, precision_rounding=rounding) < 0:
                 raise ValidationError(
-                    "La anulación dejaría la cita con cobros o devoluciones sin respaldo."
+                    "La anulación dejaría devoluciones sin cobros suficientes."
                 )
         self.sudo().write({
             "state": "void",
@@ -157,7 +153,7 @@ class BeautyAppointmentPayment(models.Model):
                     "SELECT id FROM beauty_appointment WHERE id = %s FOR UPDATE",
                     [appointment.id],
                 )
-                appointment.invalidate_recordset(["state", "amount_total"])
+                appointment.invalidate_recordset(["state"])
                 balances[appointment.id] = sum(
                     self.search([("appointment_id", "=", appointment.id)]).mapped(
                         "signed_amount"
@@ -167,11 +163,6 @@ class BeautyAppointmentPayment(models.Model):
             if kind == "payment":
                 if appointment.state not in ("confirmed", "done"):
                     raise UserError("Solo se pueden cobrar citas confirmadas o realizadas.")
-                if float_compare(
-                    balance + amount, appointment.amount_total,
-                    precision_rounding=rounding,
-                ) > 0:
-                    raise ValidationError("El cobro supera el importe pendiente de la cita.")
                 balances[appointment.id] += amount
             else:
                 if float_compare(amount, balance, precision_rounding=rounding) > 0:

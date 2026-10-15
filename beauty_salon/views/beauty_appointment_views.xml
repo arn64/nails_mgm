@@ -32,7 +32,7 @@
                     <button name="action_confirm" type="object" string="Confirmar" class="oe_highlight" invisible="state not in ('draft','to_confirm')"/>
                     <button name="action_open_whatsapp" type="object" string="WhatsApp" invisible="not partner_phone"/>
                     <button name="action_done" type="object" string="Marcar realizada" class="oe_highlight" invisible="state != 'confirmed'"/>
-                    <button name="action_register_payment" type="object" string="Registrar cobro" invisible="state not in ('confirmed','done') or amount_due &lt;= 0"/>
+                    <button name="action_register_payment" type="object" string="Registrar cobro" invisible="state not in ('confirmed','done')"/>
                     <button name="action_register_refund" type="object" string="Registrar devolución" invisible="amount_paid &lt;= 0"/>
                     <button name="action_create_sale_order" type="object" string="Crear pedido" invisible="sale_order_id or state not in ('confirmed','done')"/>
                     <button name="action_cancel" type="object" string="Cancelar" invisible="state in ('done','cancelled')"/>
