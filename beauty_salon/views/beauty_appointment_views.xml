@@ -12,7 +12,10 @@
                 <field name="end_datetime"/>
                 <field name="service_type_display" string="Tipo"/>
                 <field name="service_ids" widget="many2many_tags"/>
-                <field name="amount_total"/>
+                <field name="amount_total" sum="Total de citas"/>
+                <field name="amount_paid" sum="Cobrado neto" optional="show"/>
+                <field name="amount_due" optional="hide"/>
+                <field name="currency_id" column_invisible="True"/>
                 <field name="state" widget="badge" decoration-success="state=='done'" decoration-info="state=='confirmed'" decoration-muted="state=='cancelled'"/>
                 <field name="sale_order_id" optional="hide"/>
             </list>
@@ -29,12 +32,15 @@
                     <button name="action_confirm" type="object" string="Confirmar" class="oe_highlight" invisible="state not in ('draft','to_confirm')"/>
                     <button name="action_open_whatsapp" type="object" string="WhatsApp" invisible="not partner_phone"/>
                     <button name="action_done" type="object" string="Marcar realizada" class="oe_highlight" invisible="state != 'confirmed'"/>
+                    <button name="action_register_payment" type="object" string="Registrar cobro" invisible="state not in ('confirmed','done') or amount_due &lt;= 0"/>
+                    <button name="action_register_refund" type="object" string="Registrar devolución" invisible="amount_paid &lt;= 0"/>
                     <button name="action_create_sale_order" type="object" string="Crear pedido" invisible="sale_order_id or state not in ('confirmed','done')"/>
                     <button name="action_cancel" type="object" string="Cancelar" invisible="state in ('done','cancelled')"/>
                     <button name="action_draft" type="object" string="Volver a borrador" invisible="state != 'cancelled'"/>
                     <field name="state" widget="statusbar" statusbar_visible="draft,to_confirm,confirmed,done,cancelled"/>
                 </header>
                 <sheet>
+                    <field name="price_locked" invisible="1"/>
                     <div class="oe_button_box" name="button_box">
                         <button name="action_view_sale_order" type="object" class="oe_stat_button" icon="fa-shopping-cart" invisible="not sale_order_id">
                             <div class="o_stat_info"><span class="o_stat_text">Pedido de venta</span></div>
@@ -55,12 +61,38 @@
                             <field name="duration" widget="float_time"/>
                             <field name="end_datetime"/>
                             <field name="amount_total" readonly="1"/>
+                            <field name="amount_paid" readonly="1"/>
+                            <field name="amount_due" readonly="1" invisible="state == 'cancelled'"/>
+                            <field name="amount_not_refunded" readonly="1" invisible="state != 'cancelled'"/>
                             <field name="sale_order_id" readonly="1" invisible="not sale_order_id"/>
                             <field name="active" widget="boolean_toggle"/>
                         </group>
                     </group>
                     <group string="Servicios">
-                        <field name="service_ids" widget="many2many_checkboxes" nolabel="1"/>
+                        <field name="service_ids" widget="many2many_checkboxes" nolabel="1" readonly="price_locked"/>
+                    </group>
+                    <group string="Precios acordados" invisible="not price_locked">
+                        <field name="price_line_ids" nolabel="1" readonly="1">
+                            <list create="0" edit="0" delete="0">
+                                <field name="name"/>
+                                <field name="price_unit" sum="Importe acordado"/>
+                                <field name="currency_id" column_invisible="True"/>
+                            </list>
+                        </field>
+                    </group>
+                    <group string="Cobros y devoluciones">
+                        <field name="payment_ids" nolabel="1" readonly="1">
+                            <list create="0" edit="0" delete="0">
+                                <field name="payment_date"/>
+                                <field name="kind"/>
+                                <field name="state" widget="badge" decoration-muted="state=='void'"/>
+                                <field name="method"/>
+                                <field name="amount"/>
+                                <field name="signed_amount" sum="Cobrado neto"/>
+                                <field name="currency_id" column_invisible="True"/>
+                                <field name="reference" optional="hide"/>
+                            </list>
+                        </field>
                     </group>
                     <group string="Notas">
                         <field name="notes" nolabel="1" placeholder="Alergias, preferencias, diseños..."/>
@@ -111,6 +143,29 @@
         </field>
     </record>
 
+    <record id="view_beauty_appointment_pivot" model="ir.ui.view">
+        <field name="name">beauty.appointment.pivot</field>
+        <field name="model">beauty.appointment</field>
+        <field name="arch" type="xml">
+            <pivot string="Totales de citas por estado" display_quantity="1">
+                <field name="state" type="row"/>
+                <field name="amount_paid" type="measure"/>
+                <field name="amount_total" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+
+    <record id="view_beauty_appointment_graph" model="ir.ui.view">
+        <field name="name">beauty.appointment.graph</field>
+        <field name="model">beauty.appointment</field>
+        <field name="arch" type="xml">
+            <graph string="Importe de citas por estado" type="bar">
+                <field name="state"/>
+                <field name="amount_total" type="measure"/>
+            </graph>
+        </field>
+    </record>
+
     <record id="view_beauty_appointment_search" model="ir.ui.view">
         <field name="name">beauty.appointment.search</field>
         <field name="model">beauty.appointment</field>
@@ -119,16 +174,21 @@
                 <field name="name"/>
                 <field name="partner_id"/>
                 <field name="technician_id"/>
+                <field name="start_datetime"/>
                 <filter name="draft" string="Borrador" domain="[('state','=','draft')]"/>
                 <filter name="to_confirm" string="Por confirmar" domain="[('state','=','to_confirm')]"/>
                 <filter name="confirmed" string="Confirmadas" domain="[('state','=','confirmed')]"/>
                 <filter name="done" string="Realizadas" domain="[('state','=','done')]"/>
+                <filter name="cancelled" string="Canceladas" domain="[('state','=','cancelled')]"/>
                 <filter name="archived" string="Archivadas" domain="[('active','=',False)]"/>
                 <filter name="today" string="Hoy" domain="[('start_datetime','&gt;=', (context_today()).strftime('%Y-%m-%d 00:00:00')), ('start_datetime','&lt;=', (context_today()).strftime('%Y-%m-%d 23:59:59'))]"/>
+                <filter name="appointment_date" string="Fecha de cita" date="start_datetime"/>
                 <group>
                     <filter name="by_tech" string="Técnica" context="{'group_by':'technician_id'}"/>
                     <filter name="by_state" string="Estado" context="{'group_by':'state'}"/>
                     <filter name="by_day" string="Día" context="{'group_by':'start_datetime:day'}"/>
+                    <filter name="by_month" string="Mes" context="{'group_by':'start_datetime:month'}"/>
+                    <filter name="by_company" string="Compañía" context="{'group_by':'company_id'}" groups="base.group_multi_company"/>
                 </group>
             </search>
         </field>
@@ -137,6 +197,13 @@
     <record id="action_beauty_appointment" model="ir.actions.act_window">
         <field name="name">Citas</field>
         <field name="res_model">beauty.appointment</field>
-        <field name="view_mode">list,form,calendar,kanban</field>
+        <field name="view_mode">list,form,calendar,kanban,pivot,graph</field>
+    </record>
+
+    <record id="action_beauty_appointment_report" model="ir.actions.act_window">
+        <field name="name">Totales de citas</field>
+        <field name="res_model">beauty.appointment</field>
+        <field name="view_mode">pivot,graph,list,form</field>
+        <field name="search_view_id" ref="view_beauty_appointment_search"/>
     </record>
 </odoo>

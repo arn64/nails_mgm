@@ -45,10 +45,13 @@ class TestBeautyBooking(TransactionCase):
         day, slots = self._next_workday()
         self.assertTrue(slots)
         # Etiquetas en hora normal con am/pm y dentro de las ventanas.
-        in_morning = lambda label: label in ("10:00 am", "10:30 am")  # servicio de 1h
-        in_afternoon = lambda label: label in (
-            "1:00 pm", "1:30 pm", "2:00 pm", "2:30 pm", "3:00 pm", "3:30 pm", "4:00 pm",
-        )
+        def in_morning(label):
+            return label in ("10:00 am", "10:30 am")  # servicio de 1h
+
+        def in_afternoon(label):
+            return label in (
+                "1:00 pm", "1:30 pm", "2:00 pm", "2:30 pm", "3:00 pm", "3:30 pm", "4:00 pm",
+            )
         for slot in slots:
             self.assertTrue(
                 in_morning(slot["label"]) or in_afternoon(slot["label"]),
@@ -66,6 +69,9 @@ class TestBeautyBooking(TransactionCase):
             technician_id=first["technician_id"],
         )
         self.assertEqual(appt.state, "to_confirm")
+        self.assertTrue(appt.price_locked)
+        self.service.list_price = 30.0
+        self.assertEqual(appt.amount_total, 20.0)
         appt.action_confirm()
         self.assertEqual(appt.state, "confirmed")
         remaining = self.Appointment.get_booking_day_slots(

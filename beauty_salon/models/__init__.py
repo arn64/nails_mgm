@@ -3,4 +3,5 @@
 from . import beauty_service
 from . import beauty_technician
 from . import beauty_appointment
+from . import beauty_appointment_finance
 from . import res_partner

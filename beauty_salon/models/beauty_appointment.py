@@ -56,6 +56,26 @@ class BeautyAppointment(models.Model):
         compute="_compute_amount_total",
         store=True,
         currency_field="currency_id",
+        help="Precio actual del catálogo en borrador; después, precio acordado de la cita.",
+    )
+    price_locked = fields.Boolean(string="Precio acordado fijado", readonly=True, copy=False)
+    price_line_ids = fields.One2many(
+        "beauty.appointment.line", "appointment_id", string="Precios acordados", copy=False
+    )
+    payment_ids = fields.One2many(
+        "beauty.appointment.payment", "appointment_id", string="Cobros y devoluciones", copy=False
+    )
+    amount_paid = fields.Monetary(
+        string="Cobrado neto", compute="_compute_payment_amounts", store=True,
+        currency_field="currency_id",
+    )
+    amount_due = fields.Monetary(
+        string="Pendiente de cobro", compute="_compute_payment_amounts", store=True,
+        currency_field="currency_id",
+    )
+    amount_not_refunded = fields.Monetary(
+        string="Cobrado no devuelto", compute="_compute_payment_amounts", store=True,
+        currency_field="currency_id",
     )
     currency_id = fields.Many2one(
         "res.currency", related="company_id.currency_id", store=True
@@ -96,10 +116,31 @@ class BeautyAppointment(models.Model):
         help="Email de la técnica o, si no tiene, de su usuario vinculado.",
     )
 
-    @api.depends("service_ids", "service_ids.list_price")
+    @api.depends(
+        "service_ids", "service_ids.list_price", "price_locked",
+        "price_line_ids", "price_line_ids.price_unit",
+    )
     def _compute_amount_total(self):
         for appt in self:
-            appt.amount_total = sum(appt.service_ids.mapped("list_price"))
+            amount = sum(
+                appt.price_line_ids.mapped("price_unit")
+                if appt.price_locked else appt.service_ids.mapped("list_price")
+            )
+            appt.amount_total = appt.currency_id.round(amount) if appt.currency_id else amount
+
+    @api.depends("payment_ids", "payment_ids.signed_amount", "amount_total", "state")
+    def _compute_payment_amounts(self):
+        for appt in self:
+            paid = sum(appt.payment_ids.mapped("signed_amount"))
+            appt.amount_paid = appt.currency_id.round(paid) if appt.currency_id else paid
+            due = max(appt.amount_total - appt.amount_paid, 0.0)
+            appt.amount_due = (
+                (appt.currency_id.round(due) if appt.currency_id else due)
+                if appt.state in ("confirmed", "done") else 0.0
+            )
+            appt.amount_not_refunded = (
+                max(appt.amount_paid, 0.0) if appt.state == "cancelled" else 0.0
+            )
 
     @api.depends("service_ids")
     def _compute_service_type_display(self):
@@ -108,10 +149,16 @@ class BeautyAppointment(models.Model):
             types = sorted({labels.get(s.service_type, "") for s in appt.service_ids})
             appt.service_type_display = ", ".join(t for t in types if t)
 
-    @api.depends("service_ids", "service_ids.name")
+    @api.depends(
+        "service_ids", "service_ids.name", "price_locked",
+        "price_line_ids", "price_line_ids.name",
+    )
     def _compute_service_names_display(self):
         for appt in self:
-            appt.service_names_display = ", ".join(appt.service_ids.mapped("name"))
+            appt.service_names_display = ", ".join(
+                appt.price_line_ids.mapped("name")
+                if appt.price_locked else appt.service_ids.mapped("name")
+            )
 
     @api.depends("start_datetime", "end_datetime", "technician_id", "technician_id.tz")
     def _compute_booking_local_display(self):
@@ -203,6 +250,10 @@ class BeautyAppointment(models.Model):
     @api.model_create_multi
     def create(self, vals_list):
         for vals in vals_list:
+            if vals.get("price_locked") or vals.get("price_line_ids"):
+                raise UserError("El precio acordado se fija al solicitar o confirmar la cita.")
+            vals.pop("price_locked", None)
+            vals.pop("price_line_ids", None)
             if vals.get("name", "Nuevo") == "Nuevo":
                 vals["name"] = (
                     self.env["ir.sequence"].next_by_code("beauty.appointment") or "Nuevo"
@@ -210,7 +261,36 @@ class BeautyAppointment(models.Model):
         appointments = super().create(vals_list)
         if any(not appt.service_ids for appt in appointments):
             raise ValidationError("La cita debe tener al menos un servicio.")
+        appointments.filtered(
+            lambda appt: appt.state in ("to_confirm", "confirmed", "done", "cancelled")
+        )._lock_agreed_prices()
         return appointments
+
+    def write(self, vals):
+        if "price_locked" in vals or "price_line_ids" in vals:
+            raise UserError("El precio acordado se fija al solicitar o confirmar la cita.")
+        if "service_ids" in vals and any(appt.price_locked for appt in self):
+            raise UserError("Los servicios de una cita con precio acordado no se pueden cambiar.")
+        if "company_id" in vals and any(appt.price_locked for appt in self):
+            raise UserError("No se puede cambiar la compañía de una cita con precio acordado.")
+        result = super().write(vals)
+        if vals.get("state") in ("to_confirm", "confirmed", "done"):
+            self.filtered(lambda appt: not appt.price_locked)._lock_agreed_prices()
+        return result
+
+    def _lock_agreed_prices(self):
+        for appt in self.filtered(lambda appt: not appt.price_locked):
+            if not appt.service_ids:
+                raise ValidationError("La cita debe tener al menos un servicio.")
+            lines = [fields.Command.create({
+                "service_id": service.id,
+                "name": service.name,
+                "price_unit": service.list_price,
+            }) for service in appt.service_ids]
+            super(BeautyAppointment, appt.sudo()).write({
+                "price_line_ids": lines,
+                "price_locked": True,
+            })
 
     # --- Botones de estado ---
     # Flujo: borrador -> por confirmar (reserva del cliente) -> confirmada
@@ -392,6 +472,34 @@ class BeautyAppointment(models.Model):
             raise UserError("Solo se pueden reabrir citas canceladas.")
         self.write({"state": "draft"})
 
+    def _action_register_payment(self, kind):
+        self.ensure_one()
+        if kind == "payment" and self.state not in ("confirmed", "done"):
+            raise UserError("Confirma la cita antes de registrar un cobro.")
+        if kind == "payment" and self.amount_due <= 0:
+            raise UserError("El importe de esta cita ya está cobrado.")
+        if kind == "refund" and self.amount_paid <= 0:
+            raise UserError("Esta cita no tiene un cobro pendiente de devolver.")
+        return {
+            "type": "ir.actions.act_window",
+            "name": "Registrar cobro" if kind == "payment" else "Registrar devolución",
+            "res_model": "beauty.appointment.payment",
+            "view_mode": "form",
+            "view_id": self.env.ref("beauty_salon.view_beauty_appointment_payment_form").id,
+            "target": "new",
+            "context": {
+                "default_appointment_id": self.id,
+                "default_kind": kind,
+                "default_amount": self.amount_due if kind == "payment" else self.amount_paid,
+            },
+        }
+
+    def action_register_payment(self):
+        return self._action_register_payment("payment")
+
+    def action_register_refund(self):
+        return self._action_register_payment("refund")
+
     # --- Facturación ---
     def _create_sale_order(self):
         self.ensure_one()
@@ -399,15 +507,18 @@ class BeautyAppointment(models.Model):
             return self.sale_order_id
         if not self.service_ids:
             raise UserError("Añade al menos un servicio antes de crear el pedido.")
+        if not self.price_locked:
+            self._lock_agreed_prices()
         order_lines = []
-        for service in self.service_ids:
+        for line in self.price_line_ids:
+            service = line.service_id
             product = service._get_sale_product()
             order_lines.append((0, 0, {
                 "product_id": product.id,
                 "product_uom_id": product.uom_id.id,
                 "product_uom_qty": 1.0,
-                "price_unit": service.list_price,
-                "name": service.name,
+                "price_unit": line.price_unit,
+                "name": line.name,
             }))
         order = self.env["sale.order"].with_company(self.company_id).create(
             {

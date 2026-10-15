@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_beauty_appointment_payment_list" model="ir.ui.view">
+        <field name="name">beauty.appointment.payment.list</field>
+        <field name="model">beauty.appointment.payment</field>
+        <field name="arch" type="xml">
+            <list create="0" edit="0" delete="0">
+                <field name="payment_date"/>
+                <field name="appointment_id"/>
+                <field name="partner_id"/>
+                <field name="appointment_state"/>
+                <field name="kind"/>
+                <field name="state" widget="badge" decoration-muted="state=='void'"/>
+                <field name="method"/>
+                <field name="amount"/>
+                <field name="signed_amount" sum="Cobrado neto"/>
+                <field name="currency_id" column_invisible="True"/>
+                <field name="reference" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_beauty_appointment_payment_form" model="ir.ui.view">
+        <field name="name">beauty.appointment.payment.form</field>
+        <field name="model">beauty.appointment.payment</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button name="action_void" type="object" string="Anular registro" confirm="¿Anular este movimiento? Dejará de contar en los cobros netos." invisible="state != 'posted' or not create_date"/>
+                    <field name="state" widget="statusbar" statusbar_visible="posted,void"/>
+                </header>
+                <sheet>
+                    <field name="create_date" invisible="1"/>
+                    <group>
+                        <field name="appointment_id" readonly="1" force_save="1"/>
+                        <field name="kind"/>
+                        <field name="payment_date"/>
+                        <field name="method"/>
+                        <field name="amount"/>
+                        <field name="currency_id" invisible="1"/>
+                        <field name="reference"/>
+                        <field name="void_date" readonly="1" invisible="state != 'void'"/>
+                        <field name="void_user_id" readonly="1" invisible="state != 'void'"/>
+                    </group>
+                    <div class="alert alert-info" role="alert">
+                        Este registro controla los cobros de las citas. No crea asientos contables ni concilia facturas.
+                    </div>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_beauty_appointment_payment_pivot" model="ir.ui.view">
+        <field name="name">beauty.appointment.payment.pivot</field>
+        <field name="model">beauty.appointment.payment</field>
+        <field name="arch" type="xml">
+            <pivot string="Cobros netos por estado y mes" display_quantity="1">
+                <field name="appointment_state" type="row"/>
+                <field name="payment_date" interval="month" type="col"/>
+                <field name="signed_amount" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+
+    <record id="view_beauty_appointment_payment_graph" model="ir.ui.view">
+        <field name="name">beauty.appointment.payment.graph</field>
+        <field name="model">beauty.appointment.payment</field>
+        <field name="arch" type="xml">
+            <graph string="Cobros netos por mes" type="bar">
+                <field name="payment_date" interval="month"/>
+                <field name="signed_amount" type="measure"/>
+            </graph>
+        </field>
+    </record>
+
+    <record id="view_beauty_appointment_payment_search" model="ir.ui.view">
+        <field name="name">beauty.appointment.payment.search</field>
+        <field name="model">beauty.appointment.payment</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="appointment_id"/>
+                <field name="partner_id"/>
+                <field name="technician_id"/>
+                <filter name="payments" string="Cobros" domain="[('kind','=','payment')]"/>
+                <filter name="refunds" string="Devoluciones" domain="[('kind','=','refund')]"/>
+                <filter name="payment_date" string="Fecha de cobro" date="payment_date"/>
+                <group>
+                    <filter name="by_state" string="Estado de cita" context="{'group_by':'appointment_state'}"/>
+                    <filter name="by_month" string="Mes" context="{'group_by':'payment_date:month'}"/>
+                    <filter name="by_method" string="Método" context="{'group_by':'method'}"/>
+                    <filter name="by_tech" string="Técnica" context="{'group_by':'technician_id'}"/>
+                    <filter name="by_company" string="Compañía" context="{'group_by':'company_id'}" groups="base.group_multi_company"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_beauty_appointment_payment_report" model="ir.actions.act_window">
+        <field name="name">Cobros de citas</field>
+        <field name="res_model">beauty.appointment.payment</field>
+        <field name="domain">[('state','=','posted')]</field>
+        <field name="view_mode">pivot,graph,list,form</field>
+        <field name="search_view_id" ref="view_beauty_appointment_payment_search"/>
+    </record>
+</odoo>

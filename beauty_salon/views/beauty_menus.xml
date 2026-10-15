@@ -3,6 +3,9 @@
     <menuitem id="menu_beauty_root" name="Salón de Belleza" sequence="30"/>
 
     <menuitem id="menu_beauty_appointments" name="Citas" parent="menu_beauty_root" action="action_beauty_appointment" sequence="10"/>
+    <menuitem id="menu_beauty_reports" name="Informes" parent="menu_beauty_root" sequence="40"/>
+    <menuitem id="menu_beauty_appointment_report" name="Totales de citas" parent="menu_beauty_reports" action="action_beauty_appointment_report" sequence="10"/>
+    <menuitem id="menu_beauty_appointment_payment_report" name="Cobros de citas" parent="menu_beauty_reports" action="action_beauty_appointment_payment_report" sequence="20"/>
     <menuitem id="menu_beauty_clients" name="Clientas" parent="menu_beauty_root" action="action_beauty_clients" sequence="15"/>
     <menuitem id="menu_beauty_services" name="Servicios" parent="menu_beauty_root" action="action_beauty_service" sequence="20"/>
     <menuitem id="menu_beauty_technicians" name="Técnicas" parent="menu_beauty_root" action="action_beauty_technician" sequence="30"/>

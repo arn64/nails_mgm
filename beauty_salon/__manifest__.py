@@ -2,7 +2,7 @@
 
 {
     "name": "Salón de Belleza (Uñas y Cejas)",
-    "version": "19.0.1.4.0",
+    "version": "19.0.1.6.0",
     "summary": "Gestión de arreglos de uñas y cejas: servicios, citas, clientas y técnicas",
     "description": """
 Salón de Belleza - Uñas y Cejas
@@ -15,6 +15,7 @@ Gestión sencilla para salones de uñas y cejas:
 * Técnicas/empleadas con comisión estimada sobre servicios realizados.
 * Control de solapamientos de citas confirmadas.
 * Creación opcional de presupuesto/pedido de venta desde una cita confirmada o realizada.
+* Precios acordados al confirmar, cobros parciales, devoluciones e informes de ingresos.
     """,
     "author": "Nails MGM",
     "category": "Services/Beauty",
@@ -29,6 +30,7 @@ Gestión sencilla para salones de uñas y cejas:
         "views/beauty_service_views.xml",
         "views/beauty_technician_views.xml",
         "views/beauty_appointment_views.xml",
+        "views/beauty_appointment_payment_views.xml",
         "views/res_partner_views.xml",
         "views/beauty_booking_templates.xml",
         "views/beauty_menus.xml",

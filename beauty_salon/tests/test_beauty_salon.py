@@ -45,6 +45,12 @@ class TestBeautySalon(TransactionCase):
         self.service.list_price = 30.0
         self.assertEqual(appointment.amount_total, 30.0)
         appointment.action_confirm()
+        self.assertTrue(appointment.price_locked)
+        self.assertEqual(appointment.price_line_ids.price_unit, 30.0)
+        self.service.list_price = 40.0
+        self.assertEqual(appointment.amount_total, 30.0)
+        with self.assertRaises(UserError):
+            appointment.write({"service_ids": [(5, 0, 0)]})
         appointment.action_done()
         self.assertEqual(self.partner.beauty_last_visit, appointment.start_datetime)
         self.technician.commission_rate = 10
@@ -56,6 +62,7 @@ class TestBeautySalon(TransactionCase):
         with self.assertRaises(UserError):
             appointment.action_create_sale_order()
         appointment.action_confirm()
+        self.service.list_price = 35.0
         action = appointment.action_create_sale_order()
         order = appointment.sale_order_id
         self.assertEqual(action["res_id"], order.id)
@@ -65,6 +72,90 @@ class TestBeautySalon(TransactionCase):
         self.assertEqual(order.order_line.price_unit, 25.0)
         self.assertEqual(appointment.action_create_sale_order()["res_id"], order.id)
         self.assertEqual(self.service.product_id, order.order_line.product_id)
+
+    def test_partial_payments_refunds_and_outstanding_amounts(self):
+        appointment = self._appointment("2030-05-01 14:00:00")
+        Payment = self.env["beauty.appointment.payment"]
+        with self.assertRaises(UserError), self.cr.savepoint():
+            Payment.create({"appointment_id": appointment.id, "amount": 5.0})
+
+        appointment.action_confirm()
+        self.assertEqual(appointment.amount_due, 25.0)
+        first = Payment.create({
+            "appointment_id": appointment.id, "amount": 10.0,
+            "payment_date": "2030-05-01", "method": "cash",
+        })
+        self.assertEqual(first.signed_amount, 10.0)
+        self.assertEqual(appointment.amount_paid, 10.0)
+        self.assertEqual(appointment.amount_due, 15.0)
+        with self.assertRaises(ValidationError), self.cr.savepoint():
+            Payment.create({"appointment_id": appointment.id, "amount": 16.0})
+
+        appointment.action_cancel()
+        self.assertEqual(appointment.amount_due, 0.0)
+        self.assertEqual(appointment.amount_not_refunded, 10.0)
+        with self.assertRaises(ValidationError), self.cr.savepoint():
+            Payment.create({
+                "appointment_id": appointment.id, "kind": "refund", "amount": 11.0,
+            })
+        refund = Payment.with_context(
+            default_appointment_id=appointment.id, default_kind="refund"
+        ).create({
+            "amount": 10.0,
+            "payment_date": "2030-05-02", "method": "cash",
+        })
+        self.assertEqual(refund.signed_amount, -10.0)
+        self.assertEqual(appointment.amount_paid, 0.0)
+        self.assertEqual(appointment.amount_not_refunded, 0.0)
+
+    def test_payment_report_and_batch_limit(self):
+        appointment = self._appointment("2030-05-01 14:00:00")
+        appointment.action_confirm()
+        action = appointment.action_register_payment()
+        self.assertEqual(action["context"]["default_amount"], 25.0)
+        self.assertEqual(action["res_model"], "beauty.appointment.payment")
+        self.assertTrue(self.env.ref("beauty_salon.view_beauty_appointment_payment_pivot"))
+        with self.assertRaises(ValidationError), self.cr.savepoint():
+            self.env["beauty.appointment.payment"].create([
+                {"appointment_id": appointment.id, "amount": 15.0},
+                {"appointment_id": appointment.id, "amount": 15.0},
+            ])
+        appointment.invalidate_recordset(["payment_ids"])
+        self.assertFalse(appointment.payment_ids)
+
+    def test_void_payment_keeps_audit_and_restores_balance(self):
+        appointment = self._appointment("2030-05-01 14:00:00")
+        appointment.action_confirm()
+        payment = self.env["beauty.appointment.payment"].create({
+            "appointment_id": appointment.id, "amount": 10.0,
+        })
+        payment.action_void()
+        self.assertEqual(payment.state, "void")
+        self.assertEqual(payment.signed_amount, 0.0)
+        self.assertEqual(payment.void_user_id, self.env.user)
+        self.assertTrue(payment.void_date)
+        self.assertEqual(appointment.amount_paid, 0.0)
+        self.assertEqual(appointment.amount_due, 25.0)
+        with self.assertRaises(UserError):
+            payment.action_void()
+
+    def test_void_cannot_leave_unbacked_refund(self):
+        appointment = self._appointment("2030-05-01 14:00:00")
+        appointment.action_confirm()
+        Payment = self.env["beauty.appointment.payment"]
+        payment = Payment.create({"appointment_id": appointment.id, "amount": 10.0})
+        Payment.create({
+            "appointment_id": appointment.id, "kind": "refund", "amount": 10.0,
+        })
+        with self.assertRaises(ValidationError), self.cr.savepoint():
+            payment.action_void()
+        self.assertEqual(payment.state, "posted")
+
+    def test_directly_created_confirmed_appointment_fixes_price(self):
+        appointment = self._appointment("2030-05-01 14:00:00", state="confirmed")
+        self.assertTrue(appointment.price_locked)
+        self.service.list_price = 50.0
+        self.assertEqual(appointment.amount_total, 25.0)
 
     def test_invalid_prices_durations_and_commissions(self):
         with self.assertRaises(ValidationError), self.cr.savepoint():
