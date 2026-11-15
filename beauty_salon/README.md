@@ -26,7 +26,7 @@ En una cita confirmada o realizada, pulse **Registrar cobro** e indique importe,
 
 **Salón de Belleza > Informes > Cobros de citas** muestra el cobrado neto por fecha de pago y estado actual de la cita. Las devoluciones se restan. Estos registros son un control operativo del salón: no crean asientos contables ni concilian facturas de Odoo.
 
-La reserva web está disponible todos los días de 10:00 a 11:30 am y de 1:00 a 5:00 pm. Los sábados y domingos aparecen en amarillo y las solicitudes quedan pendientes de confirmación de la técnica.
+La reserva web está disponible todos los días de 8:30 a 11:30 am y de 1:30 a 4:30 pm. Los sábados y domingos aparecen en amarillo y las solicitudes quedan pendientes de confirmación de la técnica.
 
 ## Verificación
 

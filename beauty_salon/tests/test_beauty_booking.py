@@ -46,12 +46,21 @@ class TestBeautyBooking(TransactionCase):
         self.assertTrue(slots)
         # Etiquetas en hora normal con am/pm y dentro de las ventanas.
         def in_morning(label):
-            return label in ("10:00 am", "10:30 am")  # servicio de 1h
+            return label in (
+                "8:30 am", "9:00 am", "9:30 am", "10:00 am", "10:30 am",
+            )  # servicio de 1h
 
         def in_afternoon(label):
             return label in (
-                "1:00 pm", "1:30 pm", "2:00 pm", "2:30 pm", "3:00 pm", "3:30 pm", "4:00 pm",
+                "1:30 pm", "2:00 pm", "2:30 pm", "3:00 pm", "3:30 pm",
             )
+        labels = [slot["label"] for slot in slots]
+        self.assertIn("8:30 am", labels)
+        self.assertIn("10:30 am", labels)
+        self.assertIn("1:30 pm", labels)
+        self.assertIn("3:30 pm", labels)
+        self.assertNotIn("11:00 am", labels)
+        self.assertNotIn("4:00 pm", labels)
         for slot in slots:
             self.assertTrue(
                 in_morning(slot["label"]) or in_afternoon(slot["label"]),
@@ -59,7 +68,7 @@ class TestBeautyBooking(TransactionCase):
             )
         # La pausa del mediodía no ofrece huecos de 1h.
         self.assertNotIn("12:00 pm", [s["label"] for s in slots])
-        self.assertNotIn("9:00 am", [s["label"] for s in slots])
+        self.assertNotIn("8:00 am", [s["label"] for s in slots])
         # Reservar el primer hueco bloquea ese hueco.
         first = slots[0]
         appt = self.Appointment.create_public_booking(
@@ -78,6 +87,67 @@ class TestBeautyBooking(TransactionCase):
             day, self.service.ids, technician_id=first["technician_id"]
         )
         self.assertNotIn(first["start_utc"], [s["start_utc"] for s in remaining])
+
+    def test_booking_window_boundaries_by_service_turn(self):
+        morning_service = self.env["beauty.service"].create({
+            "name": "Servicio mañana límites",
+            "service_type": "nails",
+            "list_price": 10.0,
+            "duration": 0.5,
+            "schedule": "morning",
+        })
+        afternoon_service = self.env["beauty.service"].create({
+            "name": "Servicio tarde límites",
+            "service_type": "brows",
+            "list_price": 10.0,
+            "duration": 0.5,
+            "schedule": "afternoon",
+        })
+        self.assertEqual(
+            self.Appointment.BOOKING_WINDOWS,
+            [(8 * 60 + 30, 11 * 60 + 30), (13 * 60 + 30, 16 * 60 + 30)],
+        )
+
+        cases = [
+            # Mañana: abre 8:30, y una cita de 30 min puede acabar a las 11:30.
+            (8 * 60 + 30, 0.5, morning_service, True),
+            (8 * 60, 0.5, morning_service, False),
+            (11 * 60, 0.5, morning_service, True),
+            (11 * 60, 1.0, morning_service, False),
+            (11 * 60 + 30, 0.5, morning_service, False),
+            # La pausa sigue bloqueada; la tarde abre a la 1:30 y termina a las 4:30.
+            (12 * 60 + 30, 0.5, afternoon_service, False),
+            (13 * 60, 0.5, afternoon_service, False),
+            (13 * 60 + 30, 0.5, afternoon_service, True),
+            (16 * 60, 0.5, afternoon_service, True),
+            (16 * 60, 1.0, afternoon_service, False),
+            (16 * 60 + 30, 0.5, afternoon_service, False),
+            # Cada servicio solo se puede reservar en su turno.
+            (8 * 60 + 30, 0.5, afternoon_service, False),
+            (13 * 60 + 30, 0.5, morning_service, False),
+        ]
+        for start, duration, service, expected in cases:
+            with self.subTest(start=start, duration=duration, service=service.schedule):
+                self.assertEqual(
+                    self.Appointment._booking_slot_in_hours(start, duration, service),
+                    expected,
+                )
+
+    def test_three_hour_service_fits_each_full_window(self):
+        day, _slots = self._next_workday()
+        service = self.env["beauty.service"].create({
+            "name": "Servicio de tres horas",
+            "service_type": "nails",
+            "list_price": 30.0,
+            "duration": 3.0,
+            "schedule": "both",
+        })
+
+        slots = self.Appointment.get_booking_day_slots(
+            day, service.ids, technician_id=self.technician.id
+        )
+
+        self.assertEqual([slot["label"] for slot in slots], ["8:30 am", "1:30 pm"])
 
     def test_public_booking_validates_data(self):
         day, slots = self._next_workday()
@@ -228,10 +298,10 @@ class TestBeautyBooking(TransactionCase):
             day, self.service.ids, technician_id=self.technician.id
         )
         self.assertTrue(slots)
-        # Ventanas 10:00-11:30 am y 1:00-5:00 pm en hora de Nueva York (servicio 1h).
+        # Ventanas 8:30-11:30 am y 1:30-4:30 pm en hora de Nueva York (servicio 1h).
         allowed = {
-            (10, 0), (10, 30),
-            (13, 0), (13, 30), (14, 0), (14, 30), (15, 0), (15, 30), (16, 0),
+            (8, 30), (9, 0), (9, 30), (10, 0), (10, 30),
+            (13, 30), (14, 0), (14, 30), (15, 0), (15, 30),
         }
         for slot in slots:
             utc = datetime.strptime(
@@ -249,7 +319,7 @@ class TestBeautyBooking(TransactionCase):
         # Sin sufijo de zona (app solo Cuba): verifica la hora local de NY.
         self.assertTrue(
             appt.booking_local_display.startswith(
-                day.strftime("%d/%m/%Y") + " 10:00 am"
+                day.strftime("%d/%m/%Y") + " 8:30 am"
             ),
             appt.booking_local_display,
         )

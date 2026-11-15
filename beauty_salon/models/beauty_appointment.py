@@ -580,10 +580,10 @@ class BeautyAppointment(models.Model):
 
     # --- Reserva web pública ---
     # Horario del salón (hora local). Ventanas en minutos desde medianoche.
-    # Mañana 10:00-11:30 am y tarde 1:00-5:00 pm. Ajusta aquí si cambia.
+    # Mañana 8:30-11:30 am y tarde 1:30-4:30 pm. Ajusta aquí si cambia.
     BOOKING_TZ = "America/Havana"
-    BOOKING_WINDOWS = [(10 * 60, 11 * 60 + 30), (13 * 60, 17 * 60)]
-    BOOKING_HOURS_LABEL = "10:00–11:30 am y 1:00–5:00 pm"
+    BOOKING_WINDOWS = [(8 * 60 + 30, 11 * 60 + 30), (13 * 60 + 30, 16 * 60 + 30)]
+    BOOKING_HOURS_LABEL = "8:30–11:30 am y 1:30–4:30 pm"
     # Ventana 0 = mañana, ventana 1 = tarde (índices de BOOKING_WINDOWS).
     BOOKING_SCHEDULE_WINDOWS = {"morning": (0,), "afternoon": (1,), "both": (0, 1)}
     BOOKING_SLOT_MINUTES = 30
