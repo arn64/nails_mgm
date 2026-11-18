@@ -28,6 +28,10 @@ En una cita confirmada o realizada, pulse **Registrar cobro** e indique importe,
 
 La reserva web está disponible todos los días de 8:30 a 11:30 am y de 1:30 a 4:30 pm. Los sábados y domingos aparecen en amarillo y las solicitudes quedan pendientes de confirmación de la técnica.
 
+## Zona horaria de Cuba
+
+La conversión usa `America/Havana` mediante `pytz`. La excepción horaria cubana de 2026–2027 requiere `pytz` 2026.6 o posterior (base IANA 2026f). Después de actualizar `pytz` en el entorno Python de Odoo, reinicie el servidor; al desplegar, actualice también la dependencia en el entorno del servidor.
+
 ## Verificación
 
 Con PostgreSQL disponible, desde la carpeta raíz del proyecto:

@@ -1,13 +1,83 @@
-/** Muestra siempre am/pm en fechas-horas del backend.
+/** Muestra fechas-horas del backend con am/pm y corrige el tzdata cubano obsoleto.
  *
- * El formato de solo lectura de Odoo (Luxon según locale) puede omitir el
- * meridiano. Este parche añade "am"/"pm" cuando falta, tanto en campos
- * (formulario) como en celdas de lista. No toca la edición ni el picker.
+ * Odoo guarda los datetimes en UTC y el navegador los convierte con su propia
+ * base IANA. La corrección se aplica en la zona de Luxon para que abarque tanto
+ * la lectura como la edición del campo, sin tocar el UTC persistido.
  */
 import { patch } from "@web/core/utils/patch";
 import { registry } from "@web/core/registry";
+import { session } from "@web/session";
 import { DateTimeField } from "@web/views/fields/datetime/datetime_field";
 import { formatDate } from "@web/views/fields/formatters";
+
+const CUBA_TIMEZONES = new Set(["cuba", "america/havana"]);
+// Cuba stays at UTC-04 while old browser tzdata falls back to UTC-05.
+// These are the corresponding transition instants in UTC.
+const CUBA_CORRECTION_START = Date.UTC(2026, 10, 1, 5);
+const CUBA_CORRECTION_END = Date.UTC(2027, 10, 7, 5);
+
+class CubaCorrectedSystemZone extends luxon.Zone {
+    constructor(systemZone) {
+        super();
+        this.systemZone = systemZone;
+    }
+
+    get type() {
+        // A custom zone makes Luxon format using its own offset calculation,
+        // instead of asking Intl to apply the stale Cuba rule a second time.
+        return "cuba-corrected";
+    }
+
+    get name() {
+        return this.systemZone.name;
+    }
+
+    get isUniversal() {
+        return false;
+    }
+
+    get isValid() {
+        return this.systemZone.isValid;
+    }
+
+    offset(timestamp) {
+        const offset = this.systemZone.offset(timestamp);
+        if (
+            timestamp >= CUBA_CORRECTION_START &&
+            timestamp < CUBA_CORRECTION_END &&
+            offset === -300
+        ) {
+            return -240;
+        }
+        return offset;
+    }
+
+    offsetName(timestamp, options) {
+        return luxon.FixedOffsetZone.instance(this.offset(timestamp)).offsetName(
+            timestamp,
+            options
+        );
+    }
+
+    formatOffset(timestamp, format) {
+        return luxon.FixedOffsetZone.instance(this.offset(timestamp)).formatOffset(
+            timestamp,
+            format
+        );
+    }
+
+    equals(otherZone) {
+        return otherZone instanceof CubaCorrectedSystemZone && otherZone.name === this.name;
+    }
+}
+
+const systemZone = luxon.SystemZone.instance;
+if (
+    session.beauty_salon_cuba_tz_display_correction &&
+    CUBA_TIMEZONES.has(systemZone.name.toLowerCase())
+) {
+    luxon.Settings.defaultZone = new CubaCorrectedSystemZone(systemZone);
+}
 
 /** Convierte una hora 24h al final del texto a 12h con am/pm. */
 function to12h(text) {

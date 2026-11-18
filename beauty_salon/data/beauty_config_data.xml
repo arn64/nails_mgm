@@ -8,4 +8,8 @@
         <field name="key">beauty_salon.whatsapp_number</field>
         <field name="value">5354769627</field>
     </record>
+    <record id="beauty_cuba_tz_display_correction_param" model="ir.config_parameter">
+        <field name="key">beauty_salon.cuba_tz_display_correction</field>
+        <field name="value">True</field>
+    </record>
 </odoo>
