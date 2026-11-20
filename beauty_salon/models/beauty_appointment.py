@@ -647,11 +647,11 @@ class BeautyAppointment(models.Model):
         return self.env["beauty.technician"].search(domain, order="name")
 
     def _booking_slot_is_free(self, technician, start_utc, end_utc):
-        """True si la técnica no tiene citas (borrador/confirmada/realizada) que solapen."""
+        """True si la técnica no tiene citas (borrador/por confirmar/confirmada/realizada) que solapen."""
         return not self.search_count([
             ("id", "!=", False),
             ("technician_id", "=", technician.id),
-            ("state", "in", ("draft", "confirmed", "done")),
+            ("state", "in", ("draft", "to_confirm", "confirmed", "done")),
             ("start_datetime", "<", end_utc),
             ("end_datetime", ">", start_utc),
         ])

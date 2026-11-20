@@ -149,6 +149,27 @@ class TestBeautyBooking(TransactionCase):
 
         self.assertEqual([slot["label"] for slot in slots], ["8:30 am", "1:30 pm"])
 
+    def test_pending_request_blocks_its_slot(self):
+        day, slots = self._next_workday()
+        first = slots[0]
+        self.Appointment.create_public_booking(
+            name="Ana", phone="600111222", email="",
+            service_ids=self.service.ids,
+            start_utc_str=first["start_utc"],
+            technician_id=first["technician_id"],
+        )
+        remaining = self.Appointment.get_booking_day_slots(
+            day, self.service.ids, technician_id=first["technician_id"]
+        )
+        self.assertNotIn(first["start_utc"], [s["start_utc"] for s in remaining])
+        with self.assertRaises(ValidationError):
+            self.Appointment.create_public_booking(
+                name="Bea", phone="600333444", email="",
+                service_ids=self.service.ids,
+                start_utc_str=first["start_utc"],
+                technician_id=first["technician_id"],
+            )
+
     def test_public_booking_validates_data(self):
         day, slots = self._next_workday()
         with self.assertRaises(ValidationError):
@@ -429,7 +450,7 @@ class TestBeautyBooking(TransactionCase):
         second = self.Appointment.create_public_booking(
             name="María Gómez", phone="600111222", email="",
             service_ids=self.service.ids,
-            start_utc_str=slots[1]["start_utc"],
+            start_utc_str=slots[2]["start_utc"],
             technician_id=self.technician.id,
         )
         self.assertNotEqual(first.partner_id, second.partner_id)
@@ -447,7 +468,7 @@ class TestBeautyBooking(TransactionCase):
         second = self.Appointment.create_public_booking(
             name="Ana", phone="600111333", email="",
             service_ids=self.service.ids,
-            start_utc_str=slots[1]["start_utc"],
+            start_utc_str=slots[2]["start_utc"],
             technician_id=self.technician.id,
         )
         found = self.Appointment.search([

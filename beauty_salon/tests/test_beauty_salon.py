@@ -34,6 +34,7 @@ class TestBeautySalon(TransactionCase):
         adjacent = self._appointment("2030-05-01 15:00:00")
         adjacent.action_confirm()
         first.action_cancel()
+        second.write({"start_datetime": "2030-05-01 14:00:00"})
         second.action_confirm()
         with self.assertRaises(ValidationError), self.cr.savepoint():
             adjacent.write({"start_datetime": "2030-05-01 14:45:00"})
